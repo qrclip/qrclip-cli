@@ -113,7 +113,6 @@ func DisplayQRClipQRCode(pClipDto ClipDto, pKey string) {
 	tQRClipDataDto.Id = pClipDto.Id
 	tQRClipDataDto.SubId = pClipDto.SubId
 	tQRClipDataDto.Key = pKey
-	tQRClipDataDto.QrClipType = 1
 
 	tConfig := GetQRCodeTerminalConfig()
 

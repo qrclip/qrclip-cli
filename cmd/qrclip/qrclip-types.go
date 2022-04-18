@@ -22,10 +22,9 @@ type ClipFileDto struct {
 }
 
 type QRClipDataDto struct {
-	QrClipType int    `json:"qrClipType"`
-	Id         string `json:"id"`
-	SubId      string `json:"subId"`
-	Key        string `json:"key"`
+	Id    string `json:"id"`
+	SubId string `json:"subId"`
+	Key   string `json:"key"`
 }
 
 type UpdateClipDto struct {
