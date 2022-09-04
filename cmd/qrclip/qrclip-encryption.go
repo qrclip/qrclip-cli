@@ -4,6 +4,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/base64"
+	"encoding/hex"
 	"io"
 	"os"
 
@@ -11,7 +12,7 @@ import (
 )
 
 // EncryptText /////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func EncryptText(pTextToEncrypt string, pKey string, pIV string) string {
 	tKey, tErr := base64.StdEncoding.DecodeString(pKey)
 	if tErr != nil {
@@ -34,7 +35,7 @@ func EncryptText(pTextToEncrypt string, pKey string, pIV string) string {
 }
 
 // EncryptFile   ///////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func EncryptFile(pFile string, pKey string, pFileName string, pFileSize int64, pIV string) {
 	tKey, tErr := base64.StdEncoding.DecodeString(pKey)
 	if tErr != nil {
@@ -90,7 +91,7 @@ func EncryptFile(pFile string, pKey string, pFileName string, pFileSize int64, p
 }
 
 // OfflineEncrypt //////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func OfflineEncrypt(pFile string, pKey string) {
 	if pKey == "" {
 		pKey = GenerateEncryptionKey()
@@ -99,12 +100,36 @@ func OfflineEncrypt(pFile string, pKey string) {
 	if tErr != nil {
 		ExitWithError(pFile + " not found!")
 	}
+	tIV := GenerateRandomIV()
 
-	tEncryptedFile := pFile + ".enc" // ENCRYPTED FILE NAME
+	tHexIV := hex.EncodeToString([]byte(tIV))
+	tEncryptedFile := pFile + "_iv_" + tHexIV + ".enc" // ENCRYPTED FILE NAME
 
 	// FOR OFFLINE WE USE THE KEY FOR IV
-	EncryptFile(pFile, pKey, tEncryptedFile, tFileStat.Size(), pKey)
+	EncryptFile(pFile, pKey, tEncryptedFile, tFileStat.Size(), tIV)
 
 	ShowSuccess("ENCRYPTED FILE: " + tEncryptedFile)
 	ShowSuccess("ENCRYPTION KEY: " + pKey)
+}
+
+// EncryptBuffer   ///////////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func EncryptBuffer(pDecryptedBuffer []byte, pKey string, pIV string) []byte {
+	tKey, tErr := base64.StdEncoding.DecodeString(pKey)
+	if tErr != nil {
+		ExitWithError("Base64 key failed to decode.")
+	}
+
+	tBlock, tErr := aes.NewCipher(tKey)
+	if tErr != nil {
+		ExitWithError("Encrypting file, creating cipher")
+	}
+
+	tEncryptedBuf := make([]byte, len(pDecryptedBuffer))
+
+	tStream := cipher.NewCFBEncrypter(tBlock, []byte(pIV[:aes.BlockSize]))
+
+	tStream.XORKeyStream(tEncryptedBuf, pDecryptedBuffer)
+
+	return tEncryptedBuf
 }

@@ -4,6 +4,8 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/base64"
+	"encoding/hex"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -13,13 +15,13 @@ import (
 )
 
 // DecryptText /////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func DecryptText(pTextToDecrypt string, pKey string, pIV string) string {
 	tKey, tErr := base64.StdEncoding.DecodeString(pKey)
 	if tErr != nil {
 		ExitWithError("Base64 key failed to decode.")
 	}
-
+	fmt.Println()
 	tErrorPrefix := "Decrypting text, "
 	tText := DecodeBase64(pTextToDecrypt)
 
@@ -35,14 +37,13 @@ func DecryptText(pTextToDecrypt string, pKey string, pIV string) string {
 }
 
 // DecryptFile /////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func DecryptFile(pSrcFile string, pKey string, pDstFile string, pFileSize int64, pIV string) {
 	tKey, tErr := base64.StdEncoding.DecodeString(pKey)
 	if tErr != nil {
 		ExitWithError("Base64 key failed to decode.")
 	}
 
-	ShowInfo("DECRYPTING FILE")
 	tInFile, tErr := os.Open(pSrcFile)
 	if tErr != nil {
 		ExitWithError("Decrypting file " + pSrcFile + " , failed to open")
@@ -88,19 +89,35 @@ func DecryptFile(pSrcFile string, pKey string, pDstFile string, pFileSize int64,
 }
 
 // OfflineDecrypt //////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func OfflineDecrypt(pFile string, pKey string) {
 	tFileStat, tErr := os.Stat(pFile)
 	if tErr != nil {
 		ExitWithError(pFile + " not found!")
 	}
 
-	tDstName := pFile + ".dec" // BY DEFAULT DECRYPTED FILE APPENDS .dec
+	tDstName := pFile
 
 	// BUT IF SOURCE FILE ENDS WITH .enc THAT IS REMOVED FROM THE NAME FOR THE FILE TO HAVE THE CORRECT EXTENSION
 	tExtension := filepath.Ext(pFile)
 	if tExtension == ".enc" {
 		tDstName = strings.TrimSuffix(pFile, tExtension)
+	} else {
+		ExitWithError("The filename needs to end with .enc")
+	}
+
+	tIV := pKey
+	tIVIndex := strings.Index(tDstName, "_iv_")
+	if tIVIndex > 0 {
+		tDstName = pFile[:tIVIndex]
+		tHexIV := pFile[tIVIndex+4 : len(pFile)-4]
+		tHexDecode, err := hex.DecodeString(tHexIV)
+		if err == nil {
+			fmt.Println(tHexDecode)
+			tIV = string(tHexDecode)
+		}
+	} else {
+		ShowWarning("No IV found at the filename, the file may not be decrypted correctly!")
 	}
 
 	// CHECK IF FILE EXISTS
@@ -111,7 +128,28 @@ func OfflineDecrypt(pFile string, pKey string) {
 	}
 
 	// FOR OFFLINE WE USE THE KEY FOR IV
-	DecryptFile(pFile, pKey, tDstName, tFileStat.Size(), pKey)
+	DecryptFile(pFile, pKey, tDstName, tFileStat.Size(), tIV)
 
 	ShowSuccess("FILE WAS DECRYPTED TO: " + tDstName)
+}
+
+// DecryptBuffer /////////////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func DecryptBuffer(pEncryptedBuffer []byte, pKey string, pIV string) []byte {
+	tKey, tErr := base64.StdEncoding.DecodeString(pKey)
+	if tErr != nil {
+		ExitWithError("Base64 key failed to decode.")
+	}
+
+	tBlock, tErr := aes.NewCipher(tKey)
+	if tErr != nil {
+		ExitWithError("Decrypting buffer, creating cipher")
+	}
+
+	tDecryptedBuf := make([]byte, len(pEncryptedBuffer))
+	tStream := cipher.NewCFBDecrypter(tBlock, []byte(pIV[:aes.BlockSize]))
+
+	tStream.XORKeyStream(tDecryptedBuf, pEncryptedBuffer)
+
+	return tDecryptedBuf
 }

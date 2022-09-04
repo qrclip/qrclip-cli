@@ -12,6 +12,8 @@ type ClipDto struct {
 	MaxTransfers  int           `json:"maxTransfers"`
 	Transfers     int           `json:"transfers"`
 	Files         []ClipFileDto `json:"files"`
+	Version       int           `json:"version,omitempty"`
+	IVData        QrcIVData
 }
 
 type ClipFileDto struct {
@@ -21,12 +23,6 @@ type ClipFileDto struct {
 	ChunkCount int    `json:"chunkCount"`
 }
 
-type QRClipDataDto struct {
-	Id    string `json:"id"`
-	SubId string `json:"subId"`
-	Key   string `json:"key"`
-}
-
 type UpdateClipDto struct {
 	EncryptedText    string `json:"encryptedText"`
 	FileSize         int64  `json:"fileSize,omitempty"`
@@ -34,6 +30,8 @@ type UpdateClipDto struct {
 	MaxTransfers     int    `json:"maxTransfers,omitempty"`
 	AllowDelete      bool   `json:"allowDelete,omitempty"`
 	FirstChunkSize   int64  `json:"firstChunkSize,omitempty"`
+	Version          int    `json:"version,omitempty"`
+	Storage          string `json:"storage,omitempty"`
 }
 
 type UpdateClipResponseDto struct {
@@ -137,4 +135,10 @@ type GetFileDownloadChunkResponseDto struct {
 	Url   string `json:"url"`
 	Chunk int    `json:"chunk"`
 	Error string `json:"error"`
+}
+
+type QRClipConfigDto struct {
+	AccessToken  string `json:"accessToken"`
+	RefreshToken string `json:"refreshToken"`
+	Storage      string `json:"storage"`
 }

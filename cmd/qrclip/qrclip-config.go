@@ -1,15 +1,61 @@
 package main
 
-// API URL
-var gApiUrl = "https://api.qrclip.io"
+import (
+	"encoding/json"
+	"errors"
+	"github.com/kirsle/configdir"
+	"os"
+	"path/filepath"
+)
 
-//var gApiUrl = "http://localhost:3000"
+// getQRClipConfigFilePath /////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func getQRClipConfigFilePath() string {
+	tConfigPath := configdir.LocalConfig("qrclip")
+	tErr := configdir.MakePath(tConfigPath)
+	if tErr != nil {
+		ExitWithError("Creating config file path " + tConfigPath)
+	}
+	return filepath.Join(tConfigPath, "qrclip.json")
+}
 
-// PROGRESS BAR TEMPLATE
-var gProgressBarTemplate = `{{ " " }} {{ bar . "|" "-" (cycle . "-" "|" "-" "|" ) "." "|"}} {{percent . "%06.2f%%" "?"}}`
+// SaveQRClipConfigFile ////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func SaveQRClipConfigFile(tQRClipConfigDto QRClipConfigDto) {
+	tConfigFile := getQRClipConfigFilePath()
 
-//FILE CHUNK SIZE
-var gFileChunkSizeBytes = 1000 * 1024 * 50
+	tFh, tErr := os.Create(tConfigFile)
+	if tErr != nil {
+		ExitWithError("Creating config file at " + tConfigFile)
+	}
+	defer tFh.Close()
 
-//QRCODE WITH HALF BLOCKS - SMALLER QRCODE (doesn't work on Windows)
-var gHalfBlocks = false
+	tEncoder := json.NewEncoder(tFh)
+	tErr = tEncoder.Encode(&tQRClipConfigDto)
+	if tErr != nil {
+		ExitWithError("Error saving config")
+	}
+}
+
+// GetQRClipConfig //////////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func GetQRClipConfig() (QRClipConfigDto, error) {
+	tConfigFile := getQRClipConfigFilePath()
+	var tQRClipConfigDto QRClipConfigDto
+	if _, tErr := os.Stat(tConfigFile); os.IsNotExist(tErr) {
+		return tQRClipConfigDto, errors.New("NO CONFIG FOUND")
+	} else {
+		tFile, tErr := os.Open(tConfigFile)
+		if tErr != nil {
+			ExitWithError("Opening config file at " + tConfigFile)
+		}
+
+		tDecoder := json.NewDecoder(tFile)
+		tErr = tDecoder.Decode(&tQRClipConfigDto)
+		if tErr != nil {
+			ExitWithError("Error decoding config file!")
+		}
+
+		return tQRClipConfigDto, nil
+	}
+}

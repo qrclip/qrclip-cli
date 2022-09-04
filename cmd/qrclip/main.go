@@ -6,11 +6,11 @@ import (
 	"strconv"
 )
 
-/////////////////////////////////////////////////
+// ///////////////////////////////////////////////
 // MAIN
 func main() {
 	ShowInfoCyan("---------------------------------")
-	ShowInfoCyan("--    QRCLIP - VERSION 0.8    --")
+	ShowInfoCyan("--    QRCLIP - VERSION 0.9     --")
 	ShowInfoCyan("--                             --")
 	ShowInfoCyan("--    https://www.qrclip.io    --")
 	ShowInfoCyan("---------------------------------")
@@ -27,6 +27,7 @@ func main() {
 	tDecryptCommand := flag.NewFlagSet("d", flag.ExitOnError)
 	tGenerateKeyCommand := flag.NewFlagSet("g", flag.ExitOnError)
 	tHelpCommand := flag.NewFlagSet("h", flag.ExitOnError)
+	tStorageCommand := flag.NewFlagSet("storage", flag.ExitOnError)
 
 	////
 	// SUB COMMANDS
@@ -40,6 +41,7 @@ func main() {
 	tSendSubCmdAllowDelete := tSendCommand.String("ad", "true", "Allow Delete")
 
 	tReceiveSubCmdId := tReceiveCommand.String("i", "", "QRClip ID")
+	tReceiveSubCmdSubUrl := tReceiveCommand.String("u", "", "QRClip Url")
 	tReceiveSubCmdSubId := tReceiveCommand.String("s", "", "QRClip Sub ID")
 	tReceiveSubCmdSubKey := tReceiveCommand.String("k", "", "QRClip Key")
 
@@ -84,7 +86,7 @@ func main() {
 	// RECEIVE
 	case "r":
 		if tReceiveCommand.Parse(os.Args[2:]) == nil {
-			ReceiveQRClip(*tReceiveSubCmdId, *tReceiveSubCmdSubId, *tReceiveSubCmdSubKey)
+			ReceiveQRClip(*tReceiveSubCmdId, *tReceiveSubCmdSubId, *tReceiveSubCmdSubKey, *tReceiveSubCmdSubUrl)
 		}
 
 	// CHECK LIMITS
@@ -117,6 +119,12 @@ func main() {
 			PrintHelp()
 		}
 
+	// STORAGE
+	case "storage":
+		if tStorageCommand.Parse(os.Args[2:]) == nil {
+			handleStorageCommand()
+		}
+
 	// COMMAND NOT FOUND
 	default:
 		{
@@ -126,7 +134,7 @@ func main() {
 	}
 }
 
-/////////////////////////////////////////////////
+// ///////////////////////////////////////////////
 // HANDLE SEND COMMAND
 func handleSendCommand(
 	pSendSubCmdPath string,
@@ -157,7 +165,7 @@ func handleSendCommand(
 	SendQRClip(pSendSubCmdPath, pSendSubCmdMessage, tExpirationInMinutes, tMaxTransfers, tAllowDelete)
 }
 
-/////////////////////////////////////////////////
+// ///////////////////////////////////////////////
 // HANDLE ENCRYPT COMMAND
 func handleEncryptCommand(pEncryptSubCmdFile string, pEncryptSubCmdKey string) {
 	if pEncryptSubCmdFile == "" {
@@ -167,7 +175,7 @@ func handleEncryptCommand(pEncryptSubCmdFile string, pEncryptSubCmdKey string) {
 	OfflineEncrypt(pEncryptSubCmdFile, pEncryptSubCmdKey)
 }
 
-/////////////////////////////////////////////////
+// ///////////////////////////////////////////////
 // HANDLE DECRYPT COMMAND
 func handleDecryptCommand(pDecryptSubCmdFile string, pDecryptSubCmdKey string) {
 	if pDecryptSubCmdFile == "" || pDecryptSubCmdKey == "" {
@@ -185,7 +193,7 @@ func handleDecryptCommand(pDecryptSubCmdFile string, pDecryptSubCmdKey string) {
 	OfflineDecrypt(pDecryptSubCmdFile, pDecryptSubCmdKey)
 }
 
-/////////////////////////////////////////////////
+// ///////////////////////////////////////////////
 // HANDLE GENERATE KEY COMMAND
 func handleGenerateKeyCommand(pPhrase string) {
 	if pPhrase == "" {
@@ -193,4 +201,10 @@ func handleGenerateKeyCommand(pPhrase string) {
 	} else {
 		ShowSuccess(GenerateEncryptionKeyWithPhrase(pPhrase))
 	}
+}
+
+// ///////////////////////////////////////////////
+// HANDLE STORAGE COMMAND
+func handleStorageCommand() {
+	SelectStorage()
 }

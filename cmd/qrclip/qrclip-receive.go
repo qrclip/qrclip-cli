@@ -1,37 +1,74 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
+	"github.com/cheggaaa/pb/v3"
 	"net/http"
 	"os"
-
-	"github.com/cheggaaa/pb/v3"
+	"strings"
 )
 
 // ReceiveQRClip ///////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func ReceiveQRClip(pId string, pSubId string, pKey string) {
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func ReceiveQRClip(pId string, pSubId string, pKey string, pUrl string) {
 	if pId != "" && pSubId != "" && pKey != "" {
-		tClipDto := getQRClip(pId, pSubId)
-		// IF EXISTS SHOW IT
-		if tClipDto.Id != "" {
-			// DECRYPT AND DISPLAY TEXT THEN DOWNLOAD FILES
-			showQRClipInfo(tClipDto, pKey)
-
-			// DOWNLOAD QRCLIP FILES
-			downloadQRClipFiles(tClipDto, pKey)
-		} else {
-			ExitWithError("QRClip not found!")
-		}
+		DisplayAndDownloadQRClip(pId, pSubId, pKey)
 	} else {
-		startReceiveMode()
+		if pUrl != "" {
+			handleQRClipUrl(pUrl)
+		} else {
+			startReceiveMode()
+		}
 	}
 }
 
+// DisplayAndDownloadQRClip ////////////////////////////////////////////////////////////////////////////////////////////
+// /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func DisplayAndDownloadQRClip(pId string, pSubId string, pKey string) {
+	tClipDto := getQRClip(pId, pSubId)
+	// IF EXISTS SHOW IT
+	if tClipDto.Id != "" {
+		// DECRYPT AND DISPLAY TEXT THEN DOWNLOAD FILES
+		showQRClipInfo(tClipDto, pKey)
+
+		// DOWNLOAD QRCLIP FILES
+		downloadQRClipFiles(tClipDto, pKey)
+	} else {
+		ExitWithError("QRClip not found!")
+	}
+}
+
+// handleQRClipUrl /////////////////////////////////////////////////////////////////////////////////////////////////////
+// /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func handleQRClipUrl(tUrl string) {
+	tKey := ""
+	tId := ""
+	tSubId := ""
+	tWorkingUrl := tUrl
+	tSplitKey := strings.Split(tWorkingUrl, "#")
+	if len(tSplitKey) == 2 {
+		tKey = tSplitKey[1]
+		tWorkingUrl = tSplitKey[0]
+	}
+
+	tSplitKey = strings.Split(tWorkingUrl, "&subId=")
+	if len(tSplitKey) == 2 {
+		tSubId = tSplitKey[1]
+		tWorkingUrl = tSplitKey[0]
+	}
+
+	tSplitKey = strings.Split(tWorkingUrl, "receive/open?id=")
+	if len(tSplitKey) == 2 {
+		tId = tSplitKey[1]
+	}
+
+	DisplayAndDownloadQRClip(tId, tSubId, tKey)
+}
+
 // startReceiveMode ////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func startReceiveMode() {
 	ShowInfo("GENERATING RECEIVER")
 
@@ -68,30 +105,30 @@ userInputGOTO: // FIRST GOTO I EVER USED :) AND THIS LOOKS A PERFECT PLACE TO US
 }
 
 // showQRClipInfo //////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func showQRClipInfo(pClipDto ClipDto, pKey string) {
 	ShowSuccess("------------------------------------------------------------")
 	ShowSuccess("Id         :" + pClipDto.Id)
 	ShowSuccess("SubId      :" + pClipDto.SubId)
 	ShowSuccess("Valid until:" + pClipDto.ValidUntil)
 	ShowSuccess("Text       :")
-	ShowSuccess(DecryptText(pClipDto.EncryptedText, pKey, pClipDto.SubId))
+	ShowSuccess(DecryptText(pClipDto.EncryptedText, pKey, pClipDto.IVData.Text))
 }
 
 // downloadQRClipFiles /////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func downloadQRClipFiles(pClipDto ClipDto, pKey string) {
 	// FOR EACH FILE
 	for _, tFile := range pClipDto.Files {
 		// DECRYPT THE FILE NAME
-		tFile.Name = DecryptText(tFile.Name, pKey, pClipDto.SubId)
+		tFile.Name = DecryptText(tFile.Name, pKey, pClipDto.IVData.FileNames[tFile.Index])
 		// START DOWNLOADING
 		downloadFileWithTicket(pClipDto, pKey, tFile)
 	}
 }
 
 // downloadFileWithTicket //////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func downloadFileWithTicket(pClipDto ClipDto, pKey string, pClipFileDto ClipFileDto) {
 	tDownloadTicket := getFileDownloadTicket(pClipDto, pClipFileDto.Index)
 	if tDownloadTicket.Error != 0 {
@@ -105,65 +142,69 @@ func downloadFileWithTicket(pClipDto ClipDto, pKey string, pClipFileDto ClipFile
 		return
 	}
 
-	ShowInfo("DOWNLOADING ENCRYPTED FILE")
+	ShowInfo("DOWNLOADING FILE: " + pClipFileDto.Name)
 
-	// CREATE THE EMPTY ENCRYPTED FILE
-	tEncryptedFileName := pClipFileDto.Name + ".enc"
-	tOutFile, tErr := os.Create(tEncryptedFileName)
+	tBar := pb.ProgressBarTemplate(gProgressBarTemplate).Start64(pClipFileDto.Size)
+	defer tBar.Finish()
+
+	tDecryptedFile, tErr := os.OpenFile(pClipFileDto.Name, os.O_RDWR|os.O_CREATE, 0777)
 	if tErr != nil {
-		return
+		ExitWithError("Decrypted file " + pClipFileDto.Name + " , failed to create")
 	}
-	defer tOutFile.Close()
 
+	tEncryptedChunkBuffer := make([]byte, 1024)
 	// DOWNLOAD THE FILE CHUNK BY CHUNK AND APPEND TO ENCRYPTED FILE
 	for tChunk := 0; tChunk < pClipFileDto.ChunkCount; tChunk++ {
+
 		if tChunk == 0 {
 			// FIRST CHUNK USE THE URL FROM TICKET
-			tErr := downloadFileAppend(tOutFile, tDownloadTicket.Url)
+			tEncryptedChunkBuffer, tErr = downloadFileChunk(tDownloadTicket.Url, tBar)
 			if tErr != nil {
 				ExitWithError("Error downloading first file chunk!")
 			}
+
 		} else {
 			// REQUEST THE NEW CHUNK
 			tChunkUrl := getFileDownloadChunk(pClipDto, tDownloadTicket)
-			tErr := downloadFileAppend(tOutFile, tChunkUrl.Url)
+			tEncryptedChunkBuffer, tErr = downloadFileChunk(tChunkUrl.Url, tBar)
 			if tErr != nil {
 				ExitWithError("Error downloading chunk!")
 			}
 		}
+
+		tDecryptedChunk := DecryptBuffer(tEncryptedChunkBuffer, pKey, pClipDto.IVData.Files[pClipFileDto.Index])
+
+		// COPY THE DECRYPTED CHUNK TO THE FILE
+		_, tErr = tDecryptedFile.Write(tDecryptedChunk)
+		if tErr != nil {
+			ExitWithError("Failed to write chunk to file!")
+		}
+
 	}
-
-	// CLOSE FILE
-	tOutFile.Close()
-
-	// DECRYPT THE FILE
-	DecryptFile(tEncryptedFileName, pKey, pClipFileDto.Name, pClipFileDto.Size, pClipDto.SubId)
-
-	// REMOVE ENCRYPTED FILE
-	RemoveFile(tEncryptedFileName)
+	tBar.Finish()
 }
 
-// downloadFileAppend //////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func downloadFileAppend(pFile *os.File, pUrl string) error {
+// downloadFileChunk //////////////////////////////////////////////////////////////////////////////////////////////////
+// /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func downloadFileChunk(pUrl string, pBar *pb.ProgressBar) ([]byte, error) {
+
 	tResponse, tErr := http.Get(pUrl)
 	if tErr != nil {
-		return tErr
+		return nil, tErr
 	}
 	defer tResponse.Body.Close()
 
-	tBar := pb.ProgressBarTemplate(gProgressBarTemplate).Start64(tResponse.ContentLength)
-	defer tBar.Finish()
+	// create proxy reader
+	tReader := pBar.NewProxyReader(tResponse.Body)
 
-	tBarWriter := tBar.NewProxyWriter(pFile)
+	tBuf := new(bytes.Buffer)
+	_, tErr = tBuf.ReadFrom(tReader)
 
-	_, tErr = io.Copy(tBarWriter, tResponse.Body)
-
-	return tErr
+	return tBuf.Bytes(), tErr
 }
 
 // getFileDownloadChunk ////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func getFileDownloadChunk(
 	pClipDto ClipDto,
 	pDownloadTicket GetFileDownloadTicketResponseDto) GetFileDownloadChunkResponseDto {
@@ -188,7 +229,7 @@ func getFileDownloadChunk(
 }
 
 // getFileDownloadTicket ///////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func getFileDownloadTicket(pClipDto ClipDto, pFileIndex int) GetFileDownloadTicketResponseDto {
 	tErrorPrefix := "Error getting Download Ticket, "
 	tUrl := gApiUrl + "/clips/" + pClipDto.Id + "/" + pClipDto.SubId +
@@ -210,7 +251,7 @@ func getFileDownloadTicket(pClipDto ClipDto, pFileIndex int) GetFileDownloadTick
 }
 
 // getQRClip ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func getQRClip(pId string, pSubId string) ClipDto {
 	tErrorPrefix := "Error getting QRClip, "
 	tUrl := gApiUrl + "/clips/" + pId + "/" + pSubId
@@ -225,9 +266,34 @@ func getQRClip(pId string, pSubId string) ClipDto {
 	tClipDto.Id = ""
 	tErr = json.NewDecoder(tResponse.Body).Decode(&tClipDto)
 
+	// IV
+	tClipDto.IVData = getIVDataForClipDto(tClipDto.Version, tClipDto.SubId, len(tClipDto.Files))
+
 	if tErr != nil {
 		ExitWithError(tErrorPrefix + tErr.Error())
 	}
 
 	return tClipDto
+}
+
+// getIVDataForClipDto ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func getIVDataForClipDto(pVersion int, pSubId string, pFileNumber int) QrcIVData {
+	var tQrcIVData QrcIVData
+
+	// LEGACY - ALWAYS THE SAME (THIS CODE CAN BE REMOVED AFTER DEPLOY VERSION 2 PLUS 20 DAYS TO BE SAFE)
+	if pVersion <= 1 {
+		tQrcIVData.Text = pSubId[:16]
+		for tFileCount := 0; tFileCount < pFileNumber; tFileCount++ {
+			tQrcIVData.FileNames = append(tQrcIVData.FileNames, pSubId[:16])
+			tQrcIVData.Files = append(tQrcIVData.FileNames, pSubId[:16])
+		}
+	}
+
+	// NEW VERSION VARIABLE IV
+	if pVersion == 2 {
+		tQrcIVData = GenerateIVData(pSubId, pFileNumber)
+	}
+
+	return tQrcIVData
 }

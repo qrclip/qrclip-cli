@@ -16,12 +16,12 @@ LOGIN
  To login using qr code
   qrclip l
  With username and password
-  qrclip l -u myemail@email.com -p "My$ecretPassword"
+  qrclip l -u myemail@email.com -p "MySecretPassword"
  With username (password will be asked)
   qrclip l -u myemail@email.com
 
 LOGOUT
- To clear the credentails
+ To clear the credentials
   qrclip logout
 
 CHECK LIMITS
@@ -34,14 +34,19 @@ SEND
  qrclip s -f fileToSend
  Other Options:
   -e 15      ( Expiration Time in minutes - default 15 )
-  -mt 2      ( Max Transfers - default 2 )
+  -mt 2      ( Max transfers - default 2 )
   -ad true   ( Allow delete - default true )
 
 RECEIVE
- Generate Receiver:
+ Receive Mode:
   qrclip r
  Get QRClip:
   qrclip r -i QRClipID -s QRClipSubID -k 32CharactersEncryptionKeyEncodedInBase64
+  qrclip r -u "QRClipURL"
+
+SELECT STORAGE
+ Select storage:
+  qrclip storage
 
 ENCRYPT (OFFLINE)
  Encrypt with automatic generated key:
