@@ -142,3 +142,9 @@ type QRClipConfigDto struct {
 	RefreshToken string `json:"refreshToken"`
 	Storage      string `json:"storage"`
 }
+
+type QRCStorageLocation struct {
+	Index int
+	Code  string
+	Name  string
+}

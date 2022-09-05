@@ -26,15 +26,15 @@ func GetLimits() ClipLimitsDto {
 
 // printClipLimits /////////////////////////////////////////////////////////////////////////////////////////////////////
 // //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func printClipLimits(tClipLimitsDto ClipLimitsDto) {
+func printClipLimits(pClipLimitsDto ClipLimitsDto) {
 	ShowSuccess("QRClip LIMITS")
-	ShowSuccess(" Max Characters: " + strconv.Itoa(tClipLimitsDto.Text))
-	ShowSuccess(" Max Expiration Minutes: " + strconv.Itoa(tClipLimitsDto.ExpiresInMinutes))
-	ShowSuccess(" File Size(Mb): " + strconv.Itoa(tClipLimitsDto.FileMb))
-	if tClipLimitsDto.MaxTransfers == 0 { // IF ZERO ITS UNLIMITED
+	ShowSuccess(" Max Characters: " + strconv.Itoa(pClipLimitsDto.Text))
+	ShowSuccess(" Max Expiration Minutes: " + strconv.Itoa(pClipLimitsDto.ExpiresInMinutes))
+	ShowSuccess(" File Size(Mb): " + strconv.Itoa(pClipLimitsDto.FileMb))
+	if pClipLimitsDto.MaxTransfers == 0 { // IF ZERO ITS UNLIMITED
 		ShowSuccess(" Max Transfers: Unlimited")
 	} else {
-		ShowSuccess(" Max Transfers: " + strconv.Itoa(tClipLimitsDto.MaxTransfers))
+		ShowSuccess(" Max Transfers: " + strconv.Itoa(pClipLimitsDto.MaxTransfers))
 	}
 }
 

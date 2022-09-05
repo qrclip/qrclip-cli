@@ -86,12 +86,12 @@ func getLoginApproval() LoginApprovalDto {
 	return tLoginApprovalDto
 }
 
-// displayLoginQRCode ////////////////////////////////////////////////////////////////////////////////////////////////
+// displayLoginQRCode //////////////////////////////////////////////////////////////////////////////////////////////////
 // //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func displayLoginQRCode(tLoginApprovalDto LoginApprovalDto) {
+func displayLoginQRCode(pLoginApprovalDto LoginApprovalDto) {
 	tConfig := GetQRCodeTerminalConfig()
 
-	tData, tErr := json.Marshal(tLoginApprovalDto)
+	tData, tErr := json.Marshal(pLoginApprovalDto)
 	if tErr != nil {
 		ExitWithError("Display QR Login, " + tErr.Error())
 		return

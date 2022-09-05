@@ -64,9 +64,10 @@ func SendQRClip(pFilePath string, pMessage string, pExpiration int, pMaxTransfer
 
 // setFileUploadFinished ///////////////////////////////////////////////////////////////////////////////////////////////
 // //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func setFileUploadFinished(pFilePath string, pKey string, pClipDto ClipDto, pUpdateClipDto UpdateClipDto, pChunkCount int, tIV string) {
+func setFileUploadFinished(pFilePath string, pKey string, pClipDto ClipDto, pUpdateClipDto UpdateClipDto,
+	pChunkCount int, pIV string) {
 	var tFileUploadFinishedFileDto FileUploadFinishedFileDto
-	tFileUploadFinishedFileDto.Name = EncryptText(pFilePath, pKey, tIV)
+	tFileUploadFinishedFileDto.Name = EncryptText(pFilePath, pKey, pIV)
 	tFileUploadFinishedFileDto.Index = 0
 	tFileUploadFinishedFileDto.Size = pUpdateClipDto.FileSize
 	tFileUploadFinishedFileDto.ChunkCount = pChunkCount
@@ -81,7 +82,7 @@ func setFileUploadFinished(pFilePath string, pKey string, pClipDto ClipDto, pUpd
 	}
 }
 
-// getUpdateClipDtoObject ////////////////////////////////////////////////////////////////////////////////////////////////////
+// getUpdateClipDtoObject //////////////////////////////////////////////////////////////////////////////////////////////
 // //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func getUpdateClipDtoObject(pFilePath string, pExpiration int, pMaxTransfers int, pAllowDelete bool) UpdateClipDto {
 	var tUpdateClipDto UpdateClipDto
@@ -118,7 +119,8 @@ func getUpdateClipDtoObject(pFilePath string, pExpiration int, pMaxTransfers int
 
 // getFileChunkUploadLink //////////////////////////////////////////////////////////////////////////////////////////////
 // //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func getFileChunkUploadLink(pClipDto ClipDto, pGetFileChunkUploadLink GetFileChunkUploadLink) FileChunkUploadLinkResponse {
+func getFileChunkUploadLink(pClipDto ClipDto,
+	pGetFileChunkUploadLink GetFileChunkUploadLink) FileChunkUploadLinkResponse {
 	tErrorPrefix := "Get File Chunk Upload, "
 	tJson, tErr := json.Marshal(pGetFileChunkUploadLink)
 	if tErr != nil {
@@ -204,7 +206,7 @@ func addFormField(pWriter *multipart.Writer, pFieldName string, pFieldValue stri
 
 // getFormDataForFileUpload ////////////////////////////////////////////////////////////////////////////////////////////
 // //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func getFormDataForFileUpload(tBufferFile []byte, pS3PreSignedPost S3PreSignedPost) (*bytes.Buffer, string) {
+func getFormDataForFileUpload(pBufferFile []byte, pS3PreSignedPost S3PreSignedPost) (*bytes.Buffer, string) {
 	tErrorPrefix := "Creating form data for file upload, "
 
 	tBuffer := &bytes.Buffer{}
@@ -249,7 +251,7 @@ func getFormDataForFileUpload(tBufferFile []byte, pS3PreSignedPost S3PreSignedPo
 	if tErr != nil {
 		ExitWithError(tErrorPrefix + tErr.Error())
 	}
-	_, tErr = tFw.Write(tBufferFile)
+	_, tErr = tFw.Write(pBufferFile)
 	if tErr != nil {
 		ExitWithError(tErrorPrefix + tErr.Error())
 	}
@@ -260,10 +262,10 @@ func getFormDataForFileUpload(tBufferFile []byte, pS3PreSignedPost S3PreSignedPo
 
 // uploadChunk /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func uploadChunk(pS3PreSignedPost S3PreSignedPost, tBuffer []byte, pBar *pb.ProgressBar) {
+func uploadChunk(pS3PreSignedPost S3PreSignedPost, pBuffer []byte, pBar *pb.ProgressBar) {
 	tErrorPrefix := "Failed to upload file, "
 
-	tBody, tFormDataContentType := getFormDataForFileUpload(tBuffer, pS3PreSignedPost)
+	tBody, tFormDataContentType := getFormDataForFileUpload(pBuffer, pS3PreSignedPost)
 
 	tReader := io.Reader(tBody)
 	tPr := &ProgressReader{tReader, pBar}
@@ -287,7 +289,8 @@ func uploadChunk(pS3PreSignedPost S3PreSignedPost, tBuffer []byte, pBar *pb.Prog
 
 // uploadFileChunkByChunk //////////////////////////////////////////////////////////////////////////////////////////////
 // //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func uploadFileChunkByChunk(tClipDto ClipDto, pS3PreSignedPost S3PreSignedPost, pFileSize int64, pFilePath string, pKey string, pIV string) int {
+func uploadFileChunkByChunk(pClipDto ClipDto, pS3PreSignedPost S3PreSignedPost, pFileSize int64, pFilePath string,
+	pKey string, pIV string) int {
 	tChunkCount := int(math.Ceil(float64(pFileSize) / float64(gFileChunkSizeBytes)))
 
 	ShowInfo("UPLOADING ENCRYPTED FILE")
@@ -324,7 +327,7 @@ func uploadFileChunkByChunk(tClipDto ClipDto, pS3PreSignedPost S3PreSignedPost, 
 			tGetFileChunkUploadLink.ChunkIndex = tChunkIndex
 			tGetFileChunkUploadLink.FileIndex = 0
 			tGetFileChunkUploadLink.Size = int64(tN)
-			tNewLink := getFileChunkUploadLink(tClipDto, tGetFileChunkUploadLink)
+			tNewLink := getFileChunkUploadLink(pClipDto, tGetFileChunkUploadLink)
 			uploadChunk(tNewLink.PreSignedPost, tEncryptedBuffer, tBar)
 		}
 	}

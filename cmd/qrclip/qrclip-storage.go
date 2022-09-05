@@ -7,44 +7,45 @@ import (
 	"strconv"
 )
 
-type QRCStorageLocation struct {
-	Index int
-	Code  string
-	Name  string
-}
-
 // getLocations ////////////////////////////////////////////////////////////////////////////////////////////////////////
 // //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func getLocations() []QRCStorageLocation {
 	var tLocations []QRCStorageLocation
 
-	// FRANKFURT
+	// Amsterdam
 	var tLoc0 QRCStorageLocation
 	tLoc0.Index = 0
-	tLoc0.Name = "Frankfurt (Europe)"
-	tLoc0.Code = "storage05"
+	tLoc0.Name = "Amsterdam (Europe)"
+	tLoc0.Code = "storage02"
 	tLocations = append(tLocations, tLoc0)
 
-	// New York
+	// Frankfurt
 	var tLoc1 QRCStorageLocation
 	tLoc1.Index = 1
-	tLoc1.Name = "New York (North America)"
-	tLoc1.Code = "storage01"
+	tLoc1.Name = "Frankfurt (Europe)"
+	tLoc1.Code = "storage05"
 	tLocations = append(tLocations, tLoc1)
 
-	// San Francisco
+	// New York
 	var tLoc2 QRCStorageLocation
 	tLoc2.Index = 2
-	tLoc2.Name = "San Francisco (North America)"
-	tLoc2.Code = "storage04"
+	tLoc2.Name = "New York (North America)"
+	tLoc2.Code = "storage01"
 	tLocations = append(tLocations, tLoc2)
 
 	// San Francisco
 	var tLoc3 QRCStorageLocation
 	tLoc3.Index = 3
-	tLoc3.Name = "Singapore (Asia)"
-	tLoc3.Code = "storage03"
+	tLoc3.Name = "San Francisco (North America)"
+	tLoc3.Code = "storage04"
 	tLocations = append(tLocations, tLoc3)
+
+	// Singapore
+	var tLoc4 QRCStorageLocation
+	tLoc4.Index = 4
+	tLoc4.Name = "Singapore (Asia)"
+	tLoc4.Code = "storage03"
+	tLocations = append(tLocations, tLoc4)
 
 	return tLocations
 }
@@ -95,11 +96,11 @@ func SelectStorage() {
 
 // setStorageLocation //////////////////////////////////////////////////////////////////////////////////////////////////
 // //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func setStorageLocation(tCode string) {
+func setStorageLocation(pCode string) {
 	tConfig, tErr := GetQRClipConfig()
 	if tErr != nil {
 		var tConf QRClipConfigDto
-		tConf.Storage = tCode
+		tConf.Storage = pCode
 		tConfig = tConf
 	}
 	SaveQRClipConfigFile(tConfig)
