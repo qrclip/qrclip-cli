@@ -39,6 +39,7 @@ type UpdateClipResponseDto struct {
 	Info           string          `json:"info"`
 	ExpirationDate string          `json:"expirationDate,omitempty"`
 	PreSignedPost  S3PreSignedPost `json:"preSignedPost,omitempty"`
+	PreSignedPut   string          `json:"preSignedPut,omitempty"`
 }
 
 type CreateClipDto struct {
@@ -69,7 +70,8 @@ type GetFileChunkUploadLink struct {
 type FileChunkUploadLinkResponse struct {
 	FileIndex     int             `json:"fileIndex"`
 	ChunkIndex    int             `json:"chunkIndex"`
-	PreSignedPost S3PreSignedPost `json:"preSignedPost"`
+	PreSignedPost S3PreSignedPost `json:"preSignedPost,omitempty"`
+	PreSignedPut  string          `json:"preSignedPut,omitempty"`
 }
 
 type FileUploadFinishedDto struct {

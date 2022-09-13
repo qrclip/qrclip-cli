@@ -44,7 +44,7 @@ func SendQRClip(pFilePath string, pMessage string, pExpiration int, pMaxTransfer
 	// UPLOAD FILE
 	if tUpdateClipDto.FileSize > 0 {
 		// UPLOAD FILE
-		tChunkCount := uploadFileChunkByChunk(tClipDto, tUpdateClipResponseDto.PreSignedPost, tUpdateClipDto.FileSize, pFilePath, tKey, tQrcIVData.Files[0])
+		tChunkCount := uploadFileChunkByChunk(tClipDto, tUpdateClipResponseDto, tUpdateClipDto.FileSize, pFilePath, tKey, tQrcIVData.Files[0])
 		if tChunkCount == 0 {
 			ExitWithError("Error uploading file!")
 		}
@@ -287,9 +287,33 @@ func uploadChunk(pS3PreSignedPost S3PreSignedPost, pBuffer []byte, pBar *pb.Prog
 	defer tResponse.Body.Close()
 }
 
+// uploadChunk /////////////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func uploadChunkPut(pUrl string, pBuffer []byte, pBar *pb.ProgressBar) {
+	tErrorPrefix := "Failed to upload file, "
+
+	tReader := bytes.NewReader(pBuffer)
+	tPr := &ProgressReader{tReader, pBar}
+
+	// CREATE REQUEST
+	tRequest, tErr := http.NewRequest("PUT", pUrl, tPr)
+	if tErr != nil {
+		ExitWithError(tErrorPrefix + tErr.Error())
+	}
+	tRequest.ContentLength = int64(len(pBuffer)) // IT'S NEEDED FOR S3
+
+	// SEND REQUEST
+	tClient := &http.Client{}
+	tResponse, tErr := tClient.Do(tRequest)
+	if tErr != nil {
+		ExitWithError(tErrorPrefix + tErr.Error())
+	}
+	defer tResponse.Body.Close()
+}
+
 // uploadFileChunkByChunk //////////////////////////////////////////////////////////////////////////////////////////////
 // //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func uploadFileChunkByChunk(pClipDto ClipDto, pS3PreSignedPost S3PreSignedPost, pFileSize int64, pFilePath string,
+func uploadFileChunkByChunk(pClipDto ClipDto, pUpdateClipResponseDto UpdateClipResponseDto, pFileSize int64, pFilePath string,
 	pKey string, pIV string) int {
 	tChunkCount := int(math.Ceil(float64(pFileSize) / float64(gFileChunkSizeBytes)))
 
@@ -317,7 +341,12 @@ func uploadFileChunkByChunk(pClipDto ClipDto, pS3PreSignedPost S3PreSignedPost, 
 			tEncryptedBuffer := EncryptBuffer(tBuffer, pKey, pIV)
 
 			// UPLOAD - FIRST CHUNK USE THE PRE SIGNED POST RECEIVED WHEN UPDATING
-			uploadChunk(pS3PreSignedPost, tEncryptedBuffer, tBar)
+			if pUpdateClipResponseDto.PreSignedPut != "" {
+				uploadChunkPut(pUpdateClipResponseDto.PreSignedPut, tEncryptedBuffer, tBar)
+			} else {
+				uploadChunk(pUpdateClipResponseDto.PreSignedPost, tEncryptedBuffer, tBar)
+			}
+
 		} else {
 			// ENCRYPT BUFFER
 			tEncryptedBuffer := EncryptBuffer(tBuffer[0:tN], pKey, pIV)
@@ -328,7 +357,11 @@ func uploadFileChunkByChunk(pClipDto ClipDto, pS3PreSignedPost S3PreSignedPost, 
 			tGetFileChunkUploadLink.FileIndex = 0
 			tGetFileChunkUploadLink.Size = int64(tN)
 			tNewLink := getFileChunkUploadLink(pClipDto, tGetFileChunkUploadLink)
-			uploadChunk(tNewLink.PreSignedPost, tEncryptedBuffer, tBar)
+			if tNewLink.PreSignedPut != "" {
+				uploadChunkPut(tNewLink.PreSignedPut, tEncryptedBuffer, tBar)
+			} else {
+				uploadChunk(tNewLink.PreSignedPost, tEncryptedBuffer, tBar)
+			}
 		}
 	}
 	tBar.Finish()

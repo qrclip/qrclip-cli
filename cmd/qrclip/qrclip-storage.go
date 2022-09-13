@@ -47,6 +47,13 @@ func getLocations() []QRCStorageLocation {
 	tLoc4.Code = "storage03"
 	tLocations = append(tLocations, tLoc4)
 
+	// Storj
+	var tLoc5 QRCStorageLocation
+	tLoc5.Index = 5
+	tLoc5.Name = "Storj"
+	tLoc5.Code = "storj"
+	tLocations = append(tLocations, tLoc5)
+
 	return tLocations
 }
 
@@ -58,7 +65,7 @@ func SelectStorage() {
 	if tErr == nil {
 		tSelectedStorage = tConfig.Storage
 	}
-
+	fmt.Println(tConfig)
 	tLocations := getLocations()
 
 	ShowInfoCyan("Available Storage Locations")
@@ -100,8 +107,11 @@ func setStorageLocation(pCode string) {
 	tConfig, tErr := GetQRClipConfig()
 	if tErr != nil {
 		var tConf QRClipConfigDto
-		tConf.Storage = pCode
+		tConf.Storage = ""
+		tConf.RefreshToken = ""
+		tConf.AccessToken = ""
 		tConfig = tConf
 	}
+	tConfig.Storage = pCode
 	SaveQRClipConfigFile(tConfig)
 }

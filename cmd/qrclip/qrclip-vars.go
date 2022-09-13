@@ -4,7 +4,7 @@ package main
 var gApiUrl = "https://api.qrclip.io"
 var gSpaUrl = "https://www.qrclip.io"
 
-//var gApiUrl = "http://localhost:3000"
+// var gApiUrl = "http://localhost:3000"
 //var gSpaUrl = "http://localhost"
 
 // PROGRESS BAR TEMPLATE

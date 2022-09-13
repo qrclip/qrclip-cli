@@ -23,7 +23,6 @@ func getQRClipConfigFilePath() string {
 // //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func SaveQRClipConfigFile(pQRClipConfigDto QRClipConfigDto) {
 	tConfigFile := getQRClipConfigFilePath()
-
 	tFh, tErr := os.Create(tConfigFile)
 	if tErr != nil {
 		ExitWithError("Creating config file at " + tConfigFile)
@@ -35,6 +34,7 @@ func SaveQRClipConfigFile(pQRClipConfigDto QRClipConfigDto) {
 	if tErr != nil {
 		ExitWithError("Error saving config")
 	}
+
 }
 
 // GetQRClipConfig /////////////////////////////////////////////////////////////////////////////////////////////////////
