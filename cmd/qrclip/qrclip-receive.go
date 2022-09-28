@@ -118,18 +118,21 @@ func showQRClipInfo(pClipDto ClipDto, pKey string) {
 // downloadQRClipFiles /////////////////////////////////////////////////////////////////////////////////////////////////
 // //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func downloadQRClipFiles(pClipDto ClipDto, pKey string) {
+	tFileChunkIndex := 0 // CHUNK INDEX FOR IV INDEX CALCULATION
 	// FOR EACH FILE
 	for _, tFile := range pClipDto.Files {
 		// DECRYPT THE FILE NAME
 		tFile.Name = DecryptText(tFile.Name, pKey, pClipDto.IVData.FileNames[tFile.Index])
 		// START DOWNLOADING
-		downloadFileWithTicket(pClipDto, pKey, tFile)
+		downloadFileWithTicket(pClipDto, pKey, tFile, tFileChunkIndex)
+
+		tFileChunkIndex = tFileChunkIndex + tFile.ChunkCount
 	}
 }
 
 // downloadFileWithTicket //////////////////////////////////////////////////////////////////////////////////////////////
 // //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func downloadFileWithTicket(pClipDto ClipDto, pKey string, pClipFileDto ClipFileDto) {
+func downloadFileWithTicket(pClipDto ClipDto, pKey string, pClipFileDto ClipFileDto, pFileChunkIndexStart int) {
 	tDownloadTicket := getFileDownloadTicket(pClipDto, pClipFileDto.Index)
 	if tDownloadTicket.Error != 0 {
 		ExitWithError("Error getting download ticket:")
@@ -172,7 +175,8 @@ func downloadFileWithTicket(pClipDto ClipDto, pKey string, pClipFileDto ClipFile
 			}
 		}
 
-		tDecryptedChunk := DecryptBuffer(tEncryptedChunkBuffer, pKey, pClipDto.IVData.Files[pClipFileDto.Index])
+		tIVChunkIndex := pFileChunkIndexStart + tChunk
+		tDecryptedChunk := DecryptBuffer(tEncryptedChunkBuffer, pKey, pClipDto.IVData.Chunks[tIVChunkIndex])
 
 		// COPY THE DECRYPTED CHUNK TO THE FILE
 		_, tErr = tDecryptedFile.Write(tDecryptedChunk)
@@ -266,8 +270,14 @@ func getQRClip(pId string, pSubId string) ClipDto {
 	tClipDto.Id = ""
 	tErr = json.NewDecoder(tResponse.Body).Decode(&tClipDto)
 
+	// COUNT FILE CHUNKS
+	tFilesChunkNumber := make([]int, len(tClipDto.Files))
+	for _, tFile := range tClipDto.Files {
+		tFilesChunkNumber[tFile.Index] = tFile.ChunkCount
+	}
+
 	// IV
-	tClipDto.IVData = getIVDataForClipDto(tClipDto.Version, tClipDto.SubId, len(tClipDto.Files))
+	tClipDto.IVData = getIVDataForClipDto(tClipDto.Version, tClipDto.SubId, tFilesChunkNumber)
 
 	if tErr != nil {
 		ExitWithError(tErrorPrefix + tErr.Error())
@@ -278,22 +288,10 @@ func getQRClip(pId string, pSubId string) ClipDto {
 
 // getIVDataForClipDto /////////////////////////////////////////////////////////////////////////////////////////////////
 // //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func getIVDataForClipDto(pVersion int, pSubId string, pFileNumber int) QrcIVData {
+func getIVDataForClipDto(pVersion int, pSubId string, pFilesChunkNumber []int) QrcIVData {
 	var tQrcIVData QrcIVData
 
-	// LEGACY - ALWAYS THE SAME (THIS CODE CAN BE REMOVED AFTER DEPLOY VERSION 2 PLUS 20 DAYS TO BE SAFE)
-	if pVersion <= 1 {
-		tQrcIVData.Text = pSubId[:16]
-		for tFileCount := 0; tFileCount < pFileNumber; tFileCount++ {
-			tQrcIVData.FileNames = append(tQrcIVData.FileNames, pSubId[:16])
-			tQrcIVData.Files = append(tQrcIVData.FileNames, pSubId[:16])
-		}
-	}
-
-	// NEW VERSION VARIABLE IV
-	if pVersion == 2 {
-		tQrcIVData = GenerateIVData(pSubId, pFileNumber)
-	}
+	tQrcIVData = GenerateIVData(pVersion, pSubId, pFilesChunkNumber)
 
 	return tQrcIVData
 }

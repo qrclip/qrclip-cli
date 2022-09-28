@@ -37,33 +37,86 @@ func TestTextDecryption(t *testing.T) {
 	}
 }
 
-// TestIvGeneration ////////////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func TestIvGeneration(t *testing.T) {
-	//goland:noinspection SpellCheckingInspection
+// TestIvGenerationV3A /////////////////////////////////////////////////////////////////////////////////////////////////
+// /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func TestIvGenerationV3A(t *testing.T) {
 	tSubID := "aFDk9ekdlfFa99qlfAkfFasfjdD35Fv"
-	tIVData := GenerateIVData(tSubID, 3)
+	tFilesChunkNumber := make([]int, 2)
+	tFilesChunkNumber[0] = 30
+	tFilesChunkNumber[1] = 100
+	tIVData := GenerateIVDataV3(tSubID, tFilesChunkNumber, 3) // USE A SMALL LENGTH TO HAVE COLLISIONS WITH 16 THEY SHOULD BE VERY HARD
+
+	//goland:noinspection SpellCheckingInspection
+	if tIVData.Text != "aFD" {
+		t.Errorf("Text IV doesnt match")
+	}
+
+	//goland:noinspection SpellCheckingInspection
+	if tIVData.FileNames[0] != "DFD" {
+		t.Errorf("Filenames 0 IV doesnt match")
+	}
+
+	//goland:noinspection SpellCheckingInspection
+	if tIVData.FileNames[1] != "FFF" {
+		t.Errorf("Filenames 1 IV doesnt match")
+	}
+
+	//goland:noinspection SpellCheckingInspection
+	if tIVData.Chunks[17] != "FaF" {
+		t.Errorf("Chunk 17 IV doesnt match")
+	}
+
+	//goland:noinspection SpellCheckingInspection
+	if tIVData.Chunks[74] != "DaF" {
+		t.Errorf("Chunk 74 IV doesnt match")
+	}
+
+	//goland:noinspection SpellCheckingInspection
+	if tIVData.Chunks[129] != "DDa" {
+		t.Errorf("Chunk 129 IV doesnt match")
+	}
+
+}
+
+// TestIvGenerationV3B /////////////////////////////////////////////////////////////////////////////////////////////////
+// /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func TestIvGenerationV3B(t *testing.T) {
+	tSubID := "aFDk9ekdlfFa99qlfAkfFasfjdD35Fv"
+	tFilesChunkNumber := make([]int, 2)
+	tFilesChunkNumber[0] = 3
+	tFilesChunkNumber[1] = 5
+	tIVData := GenerateIVDataV3(tSubID, tFilesChunkNumber, 16) // USE A SMALL LENGTH TO HAVE COLLISIONS WITH 16 THEY SHOULD BE VERY HARD
 
 	//goland:noinspection SpellCheckingInspection
 	if tIVData.Text != "9d9qa9kaefFa9kl9" {
 		t.Errorf("Text IV doesnt match")
 	}
+
 	//goland:noinspection SpellCheckingInspection
 	if tIVData.FileNames[0] != "F99Fa99aDaqd9aqd" {
 		t.Errorf("Filenames 0 IV doesnt match")
 	}
+
 	//goland:noinspection SpellCheckingInspection
-	if tIVData.FileNames[2] != "l99dFl9kk9kdqdkk" {
-		t.Errorf("Filenames 2 IV doesnt match")
+	if tIVData.FileNames[1] != "Ff9qfqkF9kk9kDlk" {
+		t.Errorf("Filenames 1 IV doesnt match")
 	}
+
 	//goland:noinspection SpellCheckingInspection
-	if tIVData.Files[0] != "Ff9qfqkF9kk9kDlk" {
-		t.Errorf("Files 0 IV doesnt match")
+	if tIVData.Chunks[0] != "aq99F99ak9aF9kD9" {
+		t.Errorf("Chunk 0 IV doesnt match")
 	}
+
 	//goland:noinspection SpellCheckingInspection
-	if tIVData.Files[2] != "FF9fF9q9Da9l999d" {
-		t.Errorf("Fils 2 IV doesnt match")
+	if tIVData.Chunks[4] != "dfFll9fe9qlae9a9" {
+		t.Errorf("Chunk 4 IV doesnt match")
 	}
+
+	//goland:noinspection SpellCheckingInspection
+	if tIVData.Chunks[7] != "kFal9999da9kfqdk" {
+		t.Errorf("Chunk 7 IV doesnt match")
+	}
+
 }
 
 // TestFileEncryption //////////////////////////////////////////////////////////////////////////////////////////////////

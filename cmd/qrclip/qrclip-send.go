@@ -31,7 +31,9 @@ func SendQRClip(pFilePath string, pMessage string, pExpiration int, pMaxTransfer
 	tClipDto := CreateQRClip(false)
 
 	// GENERATE IV DATA
-	tQrcIVData := GenerateIVData(tClipDto.SubId, 1) // EVEN IF WE DO NOT HAVE FILES IT MAKES NO DIFFERENCE
+	tFilesChunkNumber := make([]int, 1)
+	tFilesChunkNumber[0] = int(math.Ceil(float64(tUpdateClipDto.FileSize) / float64(gFileChunkSizeBytes)))
+	tQrcIVData := GenerateIVData(gClientVersion, tClipDto.SubId, tFilesChunkNumber) // EVEN IF WE DO NOT HAVE FILES IT MAKES NO DIFFERENCE
 
 	// ENCRYPT TEXT MESSAGE IF EXISTS
 	if pMessage != "" {
@@ -44,7 +46,7 @@ func SendQRClip(pFilePath string, pMessage string, pExpiration int, pMaxTransfer
 	// UPLOAD FILE
 	if tUpdateClipDto.FileSize > 0 {
 		// UPLOAD FILE
-		tChunkCount := uploadFileChunkByChunk(tClipDto, tUpdateClipResponseDto, tUpdateClipDto.FileSize, pFilePath, tKey, tQrcIVData.Files[0])
+		tChunkCount := uploadFileChunkByChunk(tClipDto, tUpdateClipResponseDto, tUpdateClipDto.FileSize, pFilePath, tKey, tQrcIVData.Chunks)
 		if tChunkCount == 0 {
 			ExitWithError("Error uploading file!")
 		}
@@ -90,7 +92,7 @@ func getUpdateClipDtoObject(pFilePath string, pExpiration int, pMaxTransfers int
 	tUpdateClipDto.MaxTransfers = pMaxTransfers
 	tUpdateClipDto.AllowDelete = pAllowDelete
 	tUpdateClipDto.FileSize = 0
-	tUpdateClipDto.Version = 2
+	tUpdateClipDto.Version = gClientVersion
 
 	// SET STORAGE
 	tConfig, tError := GetQRClipConfig()
@@ -314,7 +316,7 @@ func uploadChunkPut(pUrl string, pBuffer []byte, pBar *pb.ProgressBar) {
 // uploadFileChunkByChunk //////////////////////////////////////////////////////////////////////////////////////////////
 // //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func uploadFileChunkByChunk(pClipDto ClipDto, pUpdateClipResponseDto UpdateClipResponseDto, pFileSize int64, pFilePath string,
-	pKey string, pIV string) int {
+	pKey string, pIVs []string) int {
 	tChunkCount := int(math.Ceil(float64(pFileSize) / float64(gFileChunkSizeBytes)))
 
 	ShowInfo("UPLOADING ENCRYPTED FILE")
@@ -338,7 +340,7 @@ func uploadFileChunkByChunk(pClipDto ClipDto, pUpdateClipResponseDto UpdateClipR
 		tN, _ := tFile.Read(tBuffer)
 		if tChunkIndex == 0 {
 			// ENCRYPT BUFFER
-			tEncryptedBuffer := EncryptBuffer(tBuffer, pKey, pIV)
+			tEncryptedBuffer := EncryptBuffer(tBuffer, pKey, pIVs[tChunkIndex])
 
 			// UPLOAD - FIRST CHUNK USE THE PRE SIGNED POST RECEIVED WHEN UPDATING
 			if pUpdateClipResponseDto.PreSignedPut != "" {
@@ -349,7 +351,7 @@ func uploadFileChunkByChunk(pClipDto ClipDto, pUpdateClipResponseDto UpdateClipR
 
 		} else {
 			// ENCRYPT BUFFER
-			tEncryptedBuffer := EncryptBuffer(tBuffer[0:tN], pKey, pIV)
+			tEncryptedBuffer := EncryptBuffer(tBuffer[0:tN], pKey, pIVs[tChunkIndex])
 
 			// UPLOAD - AFTER FIRST CHUNK ASK A NEW URL FOR EACH ONE
 			var tGetFileChunkUploadLink GetFileChunkUploadLink
