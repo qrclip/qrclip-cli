@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://cdn.qrclip.io/images/qrclip-github.png" alt="qrclip" />
+  <img src="https://cdn.qrclip.io/images/qrclip-github4.png" alt="qrclip" />
 </p>
 <p></p>
 <h2 align="center">Command Line Interface (CLI)</h2>
@@ -10,7 +10,6 @@
 <a href="https://www.qrclip.io">QRClip.io</a>
 <br>
 
-<br>
 ```
 LOGIN
  To login using qr code
