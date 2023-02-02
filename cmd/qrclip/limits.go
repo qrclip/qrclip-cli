@@ -1,21 +1,23 @@
 package main
 
 import (
-	"encoding/json"
-	"net/http"
 	"strconv"
 )
 
 // CheckLimits /////////////////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func CheckLimits() {
-	tLimits := GetLimits()
-	printClipLimits(tLimits)
+	tLimits, tErr := GetLimits()
+	if tErr != nil {
+		ExitWithError("Error checking limits: " + tErr.Error())
+	} else {
+		tLimits.printClipLimits()
+	}
 }
 
 // GetLimits ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func GetLimits() ClipLimitsDto {
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func GetLimits() (ClipLimitsDto, error) {
 	tJwt := CheckJwtToken()
 	if tJwt == "" {
 		return getClipLimits()
@@ -25,8 +27,8 @@ func GetLimits() ClipLimitsDto {
 }
 
 // printClipLimits /////////////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func printClipLimits(pClipLimitsDto ClipLimitsDto) {
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func (pClipLimitsDto ClipLimitsDto) printClipLimits() {
 	ShowSuccess("QRClip LIMITS")
 	ShowSuccess(" Max Characters: " + strconv.Itoa(pClipLimitsDto.Text))
 	ShowSuccess(" Max Expiration Minutes: " + strconv.Itoa(pClipLimitsDto.ExpiresInMinutes))
@@ -39,61 +41,49 @@ func printClipLimits(pClipLimitsDto ClipLimitsDto) {
 }
 
 // getClipLimits ///////////////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func getClipLimits() ClipLimitsDto {
-	tResponse, tErr := http.Get(gApiUrl + "/clips/limits")
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func getClipLimits() (ClipLimitsDto, error) {
+	// REQUEST
+	tResponse, tErr := HttpDoGet("/clips/limits", "")
 	if tErr != nil {
-		ExitWithError("Checking QRClip limits failed, " + tErr.Error())
+		return ClipLimitsDto{}, tErr
 	}
-	defer tResponse.Body.Close()
 
+	// RESPONSE
 	var tClipLimitsDto ClipLimitsDto
-	tErr = json.NewDecoder(tResponse.Body).Decode(&tClipLimitsDto)
+	tErr = DecodeJSONResponse(tResponse, &tClipLimitsDto)
 	if tErr != nil {
-		ExitWithError("Decoding ClipLimitsDto, " + tErr.Error())
+		return ClipLimitsDto{}, tErr
 	}
 
-	return tClipLimitsDto
+	return tClipLimitsDto, nil
 }
 
 // getClipLimitsUser ///////////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func getClipLimitsUser(pJwt string) ClipLimitsDto {
-	tErrorPrefix := "Checking QRClip limits for user, "
-	var tUrl = gApiUrl + "/clips/limits/user"
-
-	// CREATE THE REQUEST
-	tRequest, tErr := http.NewRequest("GET", tUrl, nil)
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func getClipLimitsUser(pJwt string) (ClipLimitsDto, error) {
+	// REQUEST
+	tResponse, tErr := HttpDoGet("/clips/limits/user", pJwt)
 	if tErr != nil {
-		ExitWithError(tErrorPrefix + tErr.Error())
+		return ClipLimitsDto{}, tErr
 	}
 
-	var tBearer = "Bearer " + pJwt
-	tRequest.Header.Add("Authorization", tBearer)
-	tRequest.Header.Set("Content-Type", "application/json")
-
-	// SEND REQUEST
-	tClient := &http.Client{}
-	tResponse, tErr := tClient.Do(tRequest)
-	if tErr != nil {
-		ExitWithError(tErrorPrefix + tErr.Error())
-	}
-
-	// PARSE RESPONSE
+	// RESPONSE
 	var tClipLimitsDto ClipLimitsDto
-	tErr = json.NewDecoder(tResponse.Body).Decode(&tClipLimitsDto)
+	tErr = DecodeJSONResponse(tResponse, &tClipLimitsDto)
 	if tErr != nil {
-		ExitWithError(tErrorPrefix + tErr.Error())
+		return ClipLimitsDto{}, tErr
 	}
-
-	return tClipLimitsDto
+	return tClipLimitsDto, nil
 }
 
 // CheckIfCanBeSent ////////////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func CheckIfCanBeSent(pUpdateClipDto *UpdateClipDto) {
-	tLimits := GetLimits()
-
+	tLimits, tErr := GetLimits()
+	if tErr != nil {
+		return
+	}
 	// TEXT LIMIT
 	if tLimits.Text < len(pUpdateClipDto.EncryptedText) {
 		ExitWithError("Text message to big, your limit is " + strconv.Itoa(tLimits.Text))

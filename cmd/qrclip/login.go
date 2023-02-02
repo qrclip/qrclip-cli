@@ -1,11 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"syscall"
 	"time"
 
@@ -18,7 +16,7 @@ import (
 var gDisplayUserData = true // TO DISPLAY THE USER DATA JUST ONCE
 
 // Login ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func Login(pUsername string, pPassword string) {
 	ShowInfo("LOGIN, PLEASE WAIT...")
 	if pUsername == "" {
@@ -29,7 +27,7 @@ func Login(pUsername string, pPassword string) {
 }
 
 // Logout //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func Logout() {
 	ShowSuccess("LOGOUT")
 	ShowSuccess("Cleaning credentials stored at:")
@@ -44,9 +42,12 @@ func Logout() {
 }
 
 // loginQRCode /////////////////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func loginQRCode() {
-	tLoginApprovalDto := getLoginApproval()
+	tLoginApprovalDto, tErr := getLoginApproval()
+	if tErr != nil {
+		ExitWithError("Login QR Code: " + tErr.Error())
+	}
 
 	displayLoginQRCode(tLoginApprovalDto)
 
@@ -57,7 +58,10 @@ userInputGOTO: // SECOND GOTO I EVER USED :D WHY NOT ?! THE LANGUAGE STARTS WITH
 	GetUserInput() // HERE IF USER WANTS ABORTS AND PROGRAM EXITS
 
 	// CHECK IF LOGIN APPROVED
-	tLogInResponseDto := qrLogin(tLoginApprovalDto)
+	tLogInResponseDto, tErr := qrLogin(tLoginApprovalDto)
+	if tErr != nil {
+		ExitWithError("QR Login error!")
+	}
 
 	// IF LOGIN NOT APPROVED GOTO THE USER INPUT OR IN CASE ITS APPROVED HANDLE IT
 	if tLogInResponseDto.Error != "" {
@@ -69,76 +73,58 @@ userInputGOTO: // SECOND GOTO I EVER USED :D WHY NOT ?! THE LANGUAGE STARTS WITH
 }
 
 // getLoginApproval ////////////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func getLoginApproval() LoginApprovalDto {
-	tResponse, tErr := http.Get(gApiUrl + "/users/login-approval")
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func getLoginApproval() (LoginApprovalDto, error) {
+	// REQUEST
+	tResponse, tErr := HttpDoGet("/users/login-approval", "")
 	if tErr != nil {
-		ExitWithError("Checking if login approved")
+		return LoginApprovalDto{}, tErr
 	}
-	defer tResponse.Body.Close()
 
+	// RESPONSE
 	var tLoginApprovalDto LoginApprovalDto
-	tErr = json.NewDecoder(tResponse.Body).Decode(&tLoginApprovalDto)
+	tErr = DecodeJSONResponse(tResponse, &tLoginApprovalDto)
 	if tErr != nil {
-		ExitWithError("Decoding login approved response")
+		return LoginApprovalDto{}, tErr
 	}
 
-	return tLoginApprovalDto
+	return tLoginApprovalDto, nil
 }
 
 // displayLoginQRCode //////////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func displayLoginQRCode(pLoginApprovalDto LoginApprovalDto) {
 	tConfig := GetQRCodeTerminalConfig()
 
 	tData, tErr := json.Marshal(pLoginApprovalDto)
 	if tErr != nil {
-		ExitWithError("Display QR Login, " + tErr.Error())
-		return
+		ExitWithError("Display QR Login: " + tErr.Error())
 	}
 
 	qrterminal.GenerateWithConfig(string(tData), tConfig)
 }
 
 // qrLogin /////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func qrLogin(pLoginApprovalDto LoginApprovalDto) LogInResponseDto {
-	tErrorPrefix := "QR code Login, "
-
-	tJson, tErr := json.Marshal(pLoginApprovalDto)
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func qrLogin(pLoginApprovalDto LoginApprovalDto) (LogInResponseDto, error) {
+	// REQUEST
+	tResponse, tErr := HttpDoPut("/users/qr-login", "", pLoginApprovalDto)
 	if tErr != nil {
-		ExitWithError("Transforming LoginApprovalDto to JSON")
+		return LogInResponseDto{}, tErr
 	}
-
-	tUrl := gApiUrl + "/users/qr-login"
-
-	// CREATE REQUEST
-	tRequest, tErr := http.NewRequest(http.MethodPut, tUrl, bytes.NewBuffer(tJson))
-	if tErr != nil {
-		ExitWithError(tErrorPrefix + tErr.Error())
-	}
-	tRequest.Header.Set("Content-Type", "application/json")
-
-	// SEND REQUEST
-	tClient := &http.Client{}
-	tResponse, tErr := tClient.Do(tRequest)
-	if tErr != nil {
-		ExitWithError(tErrorPrefix + tErr.Error())
-	}
-	defer tResponse.Body.Close()
 
 	// PARSE RESPONSE
 	var tLogInResponseDto LogInResponseDto
-	tErr = json.NewDecoder(tResponse.Body).Decode(&tLogInResponseDto)
+	tErr = DecodeJSONResponse(tResponse, &tLogInResponseDto)
 	if tErr != nil {
-		ExitWithError(tErrorPrefix + tErr.Error())
+		return LogInResponseDto{}, tErr
 	}
 
-	return tLogInResponseDto
+	return tLogInResponseDto, nil
 }
 
 // handleLogInResponse /////////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func handleLogInResponse(pLogInResponseDto LogInResponseDto) {
 	tConfig, _ := GetQRClipConfig()
 
@@ -153,7 +139,7 @@ func handleLogInResponse(pLogInResponseDto LogInResponseDto) {
 }
 
 // CheckJwtToken ///////////////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func CheckJwtToken() string {
 	tLogInDto, tErr := getStoredLogin()
 	if tErr != nil {
@@ -188,7 +174,7 @@ func CheckJwtToken() string {
 }
 
 // getStoredLogin //////////////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func getStoredLogin() (LogInDto, error) {
 	var tLogInDto LogInDto
 	tConfig, tError := GetQRClipConfig()
@@ -205,32 +191,22 @@ func getStoredLogin() (LogInDto, error) {
 }
 
 // refreshCredentials //////////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func refreshCredentials(pLogInDto LogInDto) (string, error) {
-	tErrorPrefix := "Refresh Token, "
 	var tRefreshTokenRequestDto RefreshTokenRequestDto
 	tRefreshTokenRequestDto.Token = pLogInDto.RefreshToken
 	tRefreshTokenRequestDto.UserId = getUserIdFromJWT(pLogInDto.AccessToken)
 
-	tJson, tErr := json.Marshal(tRefreshTokenRequestDto)
+	// REQUEST
+	tResponse, tErr := HttpDoPut("/users/refresh-token", "", tRefreshTokenRequestDto)
 	if tErr != nil {
-		ExitWithError(tErrorPrefix + tErr.Error())
-	}
-
-	tResponse, tErr := http.Post(gApiUrl+"/users/refresh-token", "application/json", bytes.NewBuffer(tJson))
-	if tErr != nil {
-		ExitWithError(tErrorPrefix + tErr.Error())
-	}
-	defer tResponse.Body.Close()
-
-	if tResponse.StatusCode != 201 {
-		return "", errors.New("LOGIN ERROR")
+		return "", tErr
 	}
 
 	var tLogInResponseDto LogInResponseDto
-	tErr = json.NewDecoder(tResponse.Body).Decode(&tLogInResponseDto)
+	tErr = DecodeJSONResponse(tResponse, &tLogInResponseDto)
 	if tErr != nil {
-		ExitWithError(tErrorPrefix + tErr.Error())
+		return "", tErr
 	}
 
 	if tLogInResponseDto.Error == "" {
@@ -239,11 +215,10 @@ func refreshCredentials(pLogInDto LogInDto) (string, error) {
 	} else {
 		return "", errors.New("LOGIN ERROR")
 	}
-
 }
 
 // getJWTClaim /////////////////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func getJWTClaim(pJwt string, pKeyName string) (interface{}, error) {
 	tToken, _, tErr := new(jwt.Parser).ParseUnverified(pJwt, jwt.MapClaims{})
 	if tErr != nil {
@@ -259,7 +234,7 @@ func getJWTClaim(pJwt string, pKeyName string) (interface{}, error) {
 }
 
 // getUserIdFromJWT ////////////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func getUserIdFromJWT(pJwt string) string {
 	tClaim, tErr := getJWTClaim(pJwt, "id")
 	if tErr == nil {
@@ -269,7 +244,7 @@ func getUserIdFromJWT(pJwt string) string {
 }
 
 // checkJWTValidity ////////////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func checkJWTValidity(pJwt string) bool {
 	tClaim, tErr := getJWTClaim(pJwt, "exp")
 	if tErr != nil {
@@ -291,7 +266,7 @@ func checkJWTValidity(pJwt string) bool {
 }
 
 // getAccountTypeFromJWT ///////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func getAccountTypeFromJWT(pJwt string) string {
 	tClaim, tErr := getJWTClaim(pJwt, "type")
 	if tErr != nil {
@@ -311,7 +286,7 @@ func getAccountTypeFromJWT(pJwt string) string {
 }
 
 // loginWithUsernamePassword ///////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func loginWithUsernamePassword(pUsername string, pPassword string) {
 	if pPassword == "" {
 		// GET PASSWORD FROM USER
@@ -325,26 +300,20 @@ func loginWithUsernamePassword(pUsername string, pPassword string) {
 		pPassword = string(tBytePassword)
 	}
 
-	tErrorPrefix := "Login username and password, "
 	var tLogInRequestDto LogInRequestDto
 	tLogInRequestDto.Email = pUsername
 	tLogInRequestDto.Password = pPassword
 
-	tJson, tErr := json.Marshal(tLogInRequestDto)
+	// REQUEST
+	tResponse, tErr := HttpDoPost("/users/sign-in", "", tLogInRequestDto)
 	if tErr != nil {
-		ExitWithError(tErrorPrefix + tErr.Error())
+		ExitWithError("Error login: " + tErr.Error())
 	}
-
-	tResponse, tErr := http.Post(gApiUrl+"/users/sign-in", "application/json", bytes.NewBuffer(tJson))
-	if tErr != nil {
-		ExitWithError(tErrorPrefix + tErr.Error())
-	}
-	defer tResponse.Body.Close()
 
 	var tLogInResponseDto LogInResponseDto
-	tErr = json.NewDecoder(tResponse.Body).Decode(&tLogInResponseDto)
+	tErr = DecodeJSONResponse(tResponse, &tLogInResponseDto)
 	if tErr != nil {
-		ExitWithError(tErrorPrefix + tErr.Error())
+		ExitWithError(tErr.Error())
 	}
 
 	if tLogInResponseDto.Error == "" {

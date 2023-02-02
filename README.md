@@ -3,13 +3,13 @@
 </p>
 <p></p>
 <h2 align="center">Command Line Interface (CLI)</h2>
+
+
+<h2>Easily Share Files And Texts With Any Device</h2>
+<p>Experience secure and private data transfer with self‑destructing QR codes and links</p>
+<a href="https://www.qrclip.io">QRClip.io</a>
 <br>
 
-<h2>Transfer any file to any device via QR Code</h2>
-
-
-<a href="https://www.qrclip.io">QRClip.io</a> 
-Send and receive encrypted data to and from any device without using your personal cloud or email accounts by simply scanning QR codes.
 <br>
 ```
 LOGIN
@@ -41,29 +41,12 @@ RECEIVE
  Receive Mode:
   qrclip r
  Get QRClip:
-  qrclip r -i QRClipID -s QRClipSubID -k 32CharactersEncryptionKeyEncodedInBase64
+  qrclip r -i QRClipID -s QRClipSubID -k 32CharactersEncryptionKeyEncodedInBase64Url
   qrclip r -u "QRClipURL"
 
 SELECT STORAGE
  Select storage:
   qrclip storage
-
-ENCRYPT (OFFLINE)
- Encrypt with automatic generated key:
-  qrclip e -f fileToEncrypt
- Encrypt with a specified key:
-  qrclip e -f fileToEncrypt -k 32CharactersEncryptionKeyEncodedInBase64
-
-DECRYPT (OFFLINE)
- qrclip d -f fileToDecrypt -k 32CharactersEncryptionKeyEncodedInBase64
-
-GENERATE KEY ENCODED IN BASE64
- Generate a random key:
-  qrclip g
- Generate a key with phrase:
-  qrclip g -p TheMountainFlyingOverTheRedRiver
-   < 32 characters, X's are appended
-   > 32 characters, the text is shortened to 32 characters
 
 HELP
  qrclip h

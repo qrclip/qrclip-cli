@@ -13,7 +13,7 @@ type ClipDto struct {
 	Transfers     int           `json:"transfers"`
 	Files         []ClipFileDto `json:"files"`
 	Version       int           `json:"version,omitempty"`
-	IVData        QrcIVData
+	IVGen         QRClipIVGenerator
 }
 
 type ClipFileDto struct {
@@ -32,6 +32,7 @@ type UpdateClipDto struct {
 	FirstChunkSize   int64  `json:"firstChunkSize,omitempty"`
 	Version          int    `json:"version,omitempty"`
 	Storage          string `json:"storage,omitempty"`
+	MacSize          int    `json:"macSize"`
 }
 
 type UpdateClipResponseDto struct {
@@ -65,6 +66,7 @@ type GetFileChunkUploadLink struct {
 	FileIndex  int   `json:"fileIndex"`
 	ChunkIndex int   `json:"chunkIndex"`
 	Size       int64 `json:"size"`
+	MacSize    int   `json:"macSize"`
 }
 
 type FileChunkUploadLinkResponse struct {

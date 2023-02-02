@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"github.com/cheggaaa/pb/v3"
 	"io"
@@ -28,31 +27,48 @@ func SendQRClip(pFilePath string, pMessage string, pExpiration int, pMaxTransfer
 	CheckIfCanBeSent(&tUpdateClipDto) // EXITS THE PROGRAM IF NOT OK
 
 	// CREATE QRCLIP
-	tClipDto := CreateQRClip(false)
+	tClipDto, tErr := CreateQRClip(false)
+	if tErr != nil {
+		ExitWithError("Send error: " + tErr.Error())
+	}
 
 	// GENERATE IV DATA
 	tFilesChunkNumber := make([]int, 1)
 	tFilesChunkNumber[0] = int(math.Ceil(float64(tUpdateClipDto.FileSize) / float64(gFileChunkSizeBytes)))
-	tQrcIVData := GenerateIVData(gClientVersion, tClipDto.SubId, tFilesChunkNumber) // EVEN IF WE DO NOT HAVE FILES IT MAKES NO DIFFERENCE
+
+	tQRClipIVGenerator := CreateQRClipIVGenerator(tClipDto.SubId, 24, 2500)
+
+	tIV, tErr := GetIV(&tQRClipIVGenerator, 0)
+	if tErr != nil {
+		ExitWithError(tErr.Error())
+	}
 
 	// ENCRYPT TEXT MESSAGE IF EXISTS
 	if pMessage != "" {
-		tUpdateClipDto.EncryptedText = EncryptText(pMessage, tKey, tQrcIVData.Text)
+		tUpdateClipDto.EncryptedText = EncryptText(pMessage, tKey, tIV)
 	}
 
 	// UPDATE QRCLIP
-	tUpdateClipResponseDto := updateQRClip(tClipDto, tUpdateClipDto)
+	tUpdateClipResponseDto, tErr := updateQRClip(tClipDto, tUpdateClipDto)
+	if tErr != nil {
+		ExitWithError("Error updating QRClip!")
+	}
 
 	// UPLOAD FILE
 	if tUpdateClipDto.FileSize > 0 {
 		// UPLOAD FILE
-		tChunkCount := uploadFileChunkByChunk(tClipDto, tUpdateClipResponseDto, tUpdateClipDto.FileSize, pFilePath, tKey, tQrcIVData.Chunks)
+		tChunkCount := uploadFileChunkByChunk(tClipDto, tUpdateClipResponseDto, tUpdateClipDto.FileSize, pFilePath, tKey, &tQRClipIVGenerator)
 		if tChunkCount == 0 {
 			ExitWithError("Error uploading file!")
 		}
 
+		tIV, tErr := GetIV(&tQRClipIVGenerator, 1)
+		if tErr != nil {
+			ExitWithError(tErr.Error())
+		}
+
 		// SET FILE UPLOAD FINISHED
-		setFileUploadFinished(pFilePath, tKey, tClipDto, tUpdateClipDto, tChunkCount, tQrcIVData.FileNames[0])
+		setFileUploadFinished(pFilePath, tKey, tClipDto, tUpdateClipDto, tChunkCount, tIV)
 	}
 
 	// DISPLAY QRCLIP QR CODE
@@ -78,8 +94,8 @@ func setFileUploadFinished(pFilePath string, pKey string, pClipDto ClipDto, pUpd
 	tFileUploadFinishedDto.Files = append(tFileUploadFinishedDto.Files, tFileUploadFinishedFileDto)
 
 	// SET QRCLIP FILE UPLOAD HAS FINISHED
-	tFileUploadFinishedResponseDto := fileUploadFinished(pClipDto, tFileUploadFinishedDto)
-	if !tFileUploadFinishedResponseDto.Ok {
+	tFileUploadFinishedResponseDto, tErr := fileUploadFinished(pClipDto, tFileUploadFinishedDto)
+	if tErr != nil || !tFileUploadFinishedResponseDto.Ok {
 		ExitWithError("Failed to upload file!")
 	}
 }
@@ -93,12 +109,15 @@ func getUpdateClipDtoObject(pFilePath string, pExpiration int, pMaxTransfers int
 	tUpdateClipDto.AllowDelete = pAllowDelete
 	tUpdateClipDto.FileSize = 0
 	tUpdateClipDto.Version = gClientVersion
+	tUpdateClipDto.MacSize = gMACSize
 
 	// SET STORAGE
 	tConfig, tError := GetQRClipConfig()
 	if tError == nil {
 		if tConfig.Storage != "" {
 			tUpdateClipDto.Storage = tConfig.Storage
+		} else {
+			tUpdateClipDto.Storage = "storj"
 		}
 	}
 
@@ -115,6 +134,8 @@ func getUpdateClipDtoObject(pFilePath string, pExpiration int, pMaxTransfers int
 		if tUpdateClipDto.FirstChunkSize > int64(gFileChunkSizeBytes) {
 			tUpdateClipDto.FirstChunkSize = int64(gFileChunkSizeBytes)
 		}
+
+		tUpdateClipDto.FirstChunkSize = tUpdateClipDto.FirstChunkSize + int64(gMACSize)
 	}
 	return tUpdateClipDto
 }
@@ -122,74 +143,45 @@ func getUpdateClipDtoObject(pFilePath string, pExpiration int, pMaxTransfers int
 // getFileChunkUploadLink //////////////////////////////////////////////////////////////////////////////////////////////
 // //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func getFileChunkUploadLink(pClipDto ClipDto,
-	pGetFileChunkUploadLink GetFileChunkUploadLink) FileChunkUploadLinkResponse {
-	tErrorPrefix := "Get File Chunk Upload, "
-	tJson, tErr := json.Marshal(pGetFileChunkUploadLink)
-	if tErr != nil {
-		ExitWithError(tErrorPrefix + tErr.Error())
-	}
+	pGetFileChunkUploadLink GetFileChunkUploadLink) (FileChunkUploadLinkResponse, error) {
 
-	tUrl := gApiUrl + "/clips/" + pClipDto.Id + "/" + pClipDto.SubId + "/file-chunk"
+	tUrlPath := "/clips/" + pClipDto.Id + "/" + pClipDto.SubId + "/file-chunk"
 
-	// CREATE REQUEST
-	tRequest, tErr := http.NewRequest(http.MethodPut, tUrl, bytes.NewBuffer(tJson))
+	// REQUEST
+	tResponse, tErr := HttpDoPut(tUrlPath, "", pGetFileChunkUploadLink)
 	if tErr != nil {
-		ExitWithError(tErrorPrefix + tErr.Error())
+		return FileChunkUploadLinkResponse{}, tErr
 	}
-	tRequest.Header.Set("Content-Type", "application/json")
-
-	// SEND REQUEST
-	tClient := &http.Client{}
-	tResponse, tErr := tClient.Do(tRequest)
-	if tErr != nil {
-		ExitWithError(tErrorPrefix + tErr.Error())
-	}
-	defer tResponse.Body.Close()
 
 	// PARSE  RESPONSE
 	var tFileChunkUploadLinkResponse FileChunkUploadLinkResponse
-	tErr = json.NewDecoder(tResponse.Body).Decode(&tFileChunkUploadLinkResponse)
+	tErr = DecodeJSONResponse(tResponse, &tFileChunkUploadLinkResponse)
 	if tErr != nil {
-		ExitWithError(tErrorPrefix + tErr.Error())
+		return FileChunkUploadLinkResponse{}, tErr
 	}
 
-	return tFileChunkUploadLinkResponse
+	return tFileChunkUploadLinkResponse, nil
 }
 
 // fileUploadFinished //////////////////////////////////////////////////////////////////////////////////////////////////
 // //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func fileUploadFinished(pClipDto ClipDto, pFileUploadFinishedDto FileUploadFinishedDto) FileUploadFinishedResponseDto {
-	tErrorPrefix := "Setting file upload finished, "
-	tJson, tErr := json.Marshal(pFileUploadFinishedDto)
-	if tErr != nil {
-		ExitWithError(tErrorPrefix + tErr.Error())
-	}
+func fileUploadFinished(pClipDto ClipDto, pFileUploadFinishedDto FileUploadFinishedDto) (FileUploadFinishedResponseDto, error) {
+	tUrlPath := "/clips/" + pClipDto.Id + "/" + pClipDto.SubId + "/file-upload-finished"
 
-	tUrl := gApiUrl + "/clips/" + pClipDto.Id + "/" + pClipDto.SubId + "/file-upload-finished"
-
-	// CREATE REQUEST
-	tRequest, tErr := http.NewRequest(http.MethodPut, tUrl, bytes.NewBuffer(tJson))
+	// REQUEST
+	tResponse, tErr := HttpDoPut(tUrlPath, "", pFileUploadFinishedDto)
 	if tErr != nil {
-		ExitWithError(tErrorPrefix + tErr.Error())
+		return FileUploadFinishedResponseDto{}, tErr
 	}
-	tRequest.Header.Set("Content-Type", "application/json")
-
-	// SEND REQUEST
-	tClient := &http.Client{}
-	tResponse, tErr := tClient.Do(tRequest)
-	if tErr != nil {
-		ExitWithError(tErrorPrefix + tErr.Error())
-	}
-	defer tResponse.Body.Close()
 
 	// PARSE  RESPONSE
 	var tFileUploadFinishedResponseDto FileUploadFinishedResponseDto
-	tErr = json.NewDecoder(tResponse.Body).Decode(&tFileUploadFinishedResponseDto)
+	tErr = DecodeJSONResponse(tResponse, &tFileUploadFinishedResponseDto)
 	if tErr != nil {
-		ExitWithError(tErrorPrefix + tErr.Error())
+		return FileUploadFinishedResponseDto{}, tErr
 	}
 
-	return tFileUploadFinishedResponseDto
+	return tFileUploadFinishedResponseDto, nil
 }
 
 // addFormField ////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -257,14 +249,17 @@ func getFormDataForFileUpload(pBufferFile []byte, pS3PreSignedPost S3PreSignedPo
 	if tErr != nil {
 		ExitWithError(tErrorPrefix + tErr.Error())
 	}
-	tWriter.Close()
+	err := tWriter.Close()
+	if err != nil {
+		ExitWithError(err.Error())
+	}
 
 	return tBuffer, tWriter.FormDataContentType()
 }
 
-// uploadChunk /////////////////////////////////////////////////////////////////////////////////////////////////////////
+// uploadChunkPost /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func uploadChunk(pS3PreSignedPost S3PreSignedPost, pBuffer []byte, pBar *pb.ProgressBar) {
+func uploadChunkPost(pS3PreSignedPost S3PreSignedPost, pBuffer []byte, pBar *pb.ProgressBar) {
 	tErrorPrefix := "Failed to upload file, "
 
 	tBody, tFormDataContentType := getFormDataForFileUpload(pBuffer, pS3PreSignedPost)
@@ -286,10 +281,12 @@ func uploadChunk(pS3PreSignedPost S3PreSignedPost, pBuffer []byte, pBar *pb.Prog
 	if tErr != nil {
 		ExitWithError(tErrorPrefix + tErr.Error())
 	}
-	defer tResponse.Body.Close()
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(tResponse.Body)
 }
 
-// uploadChunk /////////////////////////////////////////////////////////////////////////////////////////////////////////
+// uploadChunkPost /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func uploadChunkPut(pUrl string, pBuffer []byte, pBar *pb.ProgressBar) {
 	tErrorPrefix := "Failed to upload file, "
@@ -310,13 +307,15 @@ func uploadChunkPut(pUrl string, pBuffer []byte, pBar *pb.ProgressBar) {
 	if tErr != nil {
 		ExitWithError(tErrorPrefix + tErr.Error())
 	}
-	defer tResponse.Body.Close()
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(tResponse.Body)
 }
 
 // uploadFileChunkByChunk //////////////////////////////////////////////////////////////////////////////////////////////
 // //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func uploadFileChunkByChunk(pClipDto ClipDto, pUpdateClipResponseDto UpdateClipResponseDto, pFileSize int64, pFilePath string,
-	pKey string, pIVs []string) int {
+	pKey string, pQRClipIVGenerator *QRClipIVGenerator) int {
 	tChunkCount := int(math.Ceil(float64(pFileSize) / float64(gFileChunkSizeBytes)))
 
 	ShowInfo("UPLOADING ENCRYPTED FILE")
@@ -326,7 +325,6 @@ func uploadFileChunkByChunk(pClipDto ClipDto, pUpdateClipResponseDto UpdateClipR
 		fmt.Println("FAILED TO OPEN FILE")
 		return 0
 	}
-	defer tFile.Close()
 
 	tBar := pb.ProgressBarTemplate(gProgressBarTemplate).Start64(pFileSize)
 	defer tBar.Finish()
@@ -337,83 +335,76 @@ func uploadFileChunkByChunk(pClipDto ClipDto, pUpdateClipResponseDto UpdateClipR
 	}
 	tBuffer := make([]byte, tBufferSize)
 	for tChunkIndex := 0; tChunkIndex < tChunkCount; tChunkIndex++ {
+		tIV, tErr := GetIV(pQRClipIVGenerator, int64(tChunkIndex+2))
+		if tErr != nil {
+			ExitWithError(tErr.Error())
+		}
+
 		tN, _ := tFile.Read(tBuffer)
 		if tChunkIndex == 0 {
+
 			// ENCRYPT BUFFER
-			tEncryptedBuffer := EncryptBuffer(tBuffer, pKey, pIVs[tChunkIndex])
+			tEncryptedBuffer := EncryptBuffer(tBuffer, pKey, tIV)
 
 			// UPLOAD - FIRST CHUNK USE THE PRE SIGNED POST RECEIVED WHEN UPDATING
 			if pUpdateClipResponseDto.PreSignedPut != "" {
 				uploadChunkPut(pUpdateClipResponseDto.PreSignedPut, tEncryptedBuffer, tBar)
 			} else {
-				uploadChunk(pUpdateClipResponseDto.PreSignedPost, tEncryptedBuffer, tBar)
+				uploadChunkPost(pUpdateClipResponseDto.PreSignedPost, tEncryptedBuffer, tBar)
 			}
 
 		} else {
 			// ENCRYPT BUFFER
-			tEncryptedBuffer := EncryptBuffer(tBuffer[0:tN], pKey, pIVs[tChunkIndex])
+			tEncryptedBuffer := EncryptBuffer(tBuffer[0:tN], pKey, tIV)
 
 			// UPLOAD - AFTER FIRST CHUNK ASK A NEW URL FOR EACH ONE
 			var tGetFileChunkUploadLink GetFileChunkUploadLink
 			tGetFileChunkUploadLink.ChunkIndex = tChunkIndex
 			tGetFileChunkUploadLink.FileIndex = 0
-			tGetFileChunkUploadLink.Size = int64(tN)
-			tNewLink := getFileChunkUploadLink(pClipDto, tGetFileChunkUploadLink)
+			tGetFileChunkUploadLink.Size = int64(tN + gMACSize)
+			tGetFileChunkUploadLink.MacSize = gMACSize
+			tNewLink, tErr := getFileChunkUploadLink(pClipDto, tGetFileChunkUploadLink)
+			if tErr != nil {
+				ExitWithError(err.Error())
+			}
 			if tNewLink.PreSignedPut != "" {
 				uploadChunkPut(tNewLink.PreSignedPut, tEncryptedBuffer, tBar)
 			} else {
-				uploadChunk(tNewLink.PreSignedPost, tEncryptedBuffer, tBar)
+				uploadChunkPost(tNewLink.PreSignedPost, tEncryptedBuffer, tBar)
 			}
 		}
 	}
 	tBar.Finish()
-	tFile.Close()
+	err = tFile.Close()
+	if err != nil {
+		ExitWithError(err.Error())
+	}
 
 	return tChunkCount
 }
 
 // updateQRClip ////////////////////////////////////////////////////////////////////////////////////////////////////////
 // //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func updateQRClip(pClipDto ClipDto, pUpdateClipDto UpdateClipDto) UpdateClipResponseDto {
-	tErrorPrefix := "Updating QRClip, "
+func updateQRClip(pClipDto ClipDto, pUpdateClipDto UpdateClipDto) (UpdateClipResponseDto, error) {
 	tJwt := CheckJwtToken()
 
-	tJson, tErr := json.Marshal(pUpdateClipDto)
-	if tErr != nil {
-		ExitWithError(tErrorPrefix + tErr.Error())
-	}
-
-	tUrl := gApiUrl + "/clips/" + pClipDto.Id + "/" + pClipDto.SubId
+	tUrlPath := "/clips/" + pClipDto.Id + "/" + pClipDto.SubId
 	if tJwt != "" {
-		tUrl = tUrl + "/user"
+		tUrlPath = tUrlPath + "/user"
 	}
 
-	// CREATE REQUEST
-	tRequest, tErr := http.NewRequest(http.MethodPut, tUrl, bytes.NewBuffer(tJson))
+	// REQUEST
+	tResponse, tErr := HttpDoPut(tUrlPath, tJwt, pUpdateClipDto)
 	if tErr != nil {
-		ExitWithError(tErrorPrefix + tErr.Error())
+		return UpdateClipResponseDto{}, tErr
 	}
-	tRequest.Header.Set("Content-Type", "application/json")
-
-	// IN CASE THERE'S A JWT TOKEN USE IT
-	if tJwt != "" {
-		tRequest.Header.Add("Authorization", "Bearer "+tJwt)
-	}
-
-	// SEND REQUEST
-	tClient := &http.Client{}
-	tResponse, tErr := tClient.Do(tRequest)
-	if tErr != nil {
-		ExitWithError(tErrorPrefix + tErr.Error())
-	}
-	defer tResponse.Body.Close()
 
 	// PARSE RESPONSE
 	var tUpdateClipResponseDto UpdateClipResponseDto
-	tErr = json.NewDecoder(tResponse.Body).Decode(&tUpdateClipResponseDto)
+	tErr = DecodeJSONResponse(tResponse, &tUpdateClipResponseDto)
 	if tErr != nil {
-		ExitWithError(tErrorPrefix + tErr.Error())
+		return UpdateClipResponseDto{}, tErr
 	}
 
-	return tUpdateClipResponseDto
+	return tUpdateClipResponseDto, nil
 }

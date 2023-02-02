@@ -7,26 +7,23 @@ import (
 )
 
 // main ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func main() {
 	ShowInfoCyan("---------------------------------")
-	ShowInfoCyan("--    QRCLIP - VERSION 0.92    --")
+	ShowInfoCyan("--    QRCLIP - VERSION 0.98    --")
 	ShowInfoCyan("--                             --")
-	ShowInfoCyan("--    https://www.qrclip.io    --")
+	ShowInfoCyan("--    https://app.qrclip.io    --")
 	ShowInfoCyan("---------------------------------")
 	ShowInfo("")
 
 	////
 	// COMMANDS
-	tLoginCommand := flag.NewFlagSet("l", flag.ExitOnError)
+	tLoginCommand := flag.NewFlagSet("login", flag.ExitOnError)
 	tLogoutCommand := flag.NewFlagSet("logout", flag.ExitOnError)
-	tSendCommand := flag.NewFlagSet("s", flag.ExitOnError)
-	tReceiveCommand := flag.NewFlagSet("r", flag.ExitOnError)
-	tCheckCommand := flag.NewFlagSet("c", flag.ExitOnError)
-	tEncryptCommand := flag.NewFlagSet("e", flag.ExitOnError)
-	tDecryptCommand := flag.NewFlagSet("d", flag.ExitOnError)
-	tGenerateKeyCommand := flag.NewFlagSet("g", flag.ExitOnError)
-	tHelpCommand := flag.NewFlagSet("h", flag.ExitOnError)
+	tSendCommand := flag.NewFlagSet("send", flag.ExitOnError)
+	tReceiveCommand := flag.NewFlagSet("receive", flag.ExitOnError)
+	tCheckCommand := flag.NewFlagSet("check", flag.ExitOnError)
+	tHelpCommand := flag.NewFlagSet("help", flag.ExitOnError)
 	tStorageCommand := flag.NewFlagSet("storage", flag.ExitOnError)
 
 	////
@@ -45,14 +42,6 @@ func main() {
 	tReceiveSubCmdSubId := tReceiveCommand.String("s", "", "QRClip Sub ID")
 	tReceiveSubCmdSubKey := tReceiveCommand.String("k", "", "QRClip Key")
 
-	tEncryptSubCmdFile := tEncryptCommand.String("f", "", "File to encrypt")
-	tEncryptSubCmdKey := tEncryptCommand.String("k", "", "Encryption Key (if none, one is generated)")
-
-	tDecryptSubCmdFile := tDecryptCommand.String("f", "", "File to decrypt")
-	tDecryptSubCmdKey := tDecryptCommand.String("k", "", "Decryption Key")
-
-	tGenerateKeySubCmdPhrase := tGenerateKeyCommand.String("p", "", "Phrase")
-
 	////
 	// IF NO COMMAND FOUND SHOW HELP
 	if len(os.Args) < 2 {
@@ -65,56 +54,38 @@ func main() {
 	switch os.Args[1] {
 
 	// LOGIN
-	case "l":
+	case "login", "l":
 		if tLoginCommand.Parse(os.Args[2:]) == nil {
 			Login(*tLoginSubCmdUser, *tLoginSubCmdPassword)
 		}
 
 	// LOGOUT
-	case "logout":
+	case "logout", "q":
 		if tLogoutCommand.Parse(os.Args[2:]) == nil {
 			Logout()
 		}
 
 	// SEND
-	case "s":
+	case "send", "s":
 		if tSendCommand.Parse(os.Args[2:]) == nil {
 			handleSendCommand(*tSendSubCmdPath, *tSendSubCmdMessage, *tSendSubCmdExpiration,
 				*tSendSubCmdMaxTransfers, *tSendSubCmdAllowDelete)
 		}
 
 	// RECEIVE
-	case "r":
+	case "receive", "r":
 		if tReceiveCommand.Parse(os.Args[2:]) == nil {
 			ReceiveQRClip(*tReceiveSubCmdId, *tReceiveSubCmdSubId, *tReceiveSubCmdSubKey, *tReceiveSubCmdSubUrl)
 		}
 
 	// CHECK LIMITS
-	case "c":
+	case "check", "c":
 		if tCheckCommand.Parse(os.Args[2:]) == nil {
 			CheckLimits()
 		}
 
-	// ENCRYPT OFFLINE
-	case "e":
-		if tEncryptCommand.Parse(os.Args[2:]) == nil {
-			handleEncryptCommand(*tEncryptSubCmdFile, *tEncryptSubCmdKey)
-		}
-
-	// DECRYPT OFFLINE
-	case "d":
-		if tDecryptCommand.Parse(os.Args[2:]) == nil {
-			handleDecryptCommand(*tDecryptSubCmdFile, *tDecryptSubCmdKey)
-		}
-
-	// GENERATE KEY
-	case "g":
-		if tGenerateKeyCommand.Parse(os.Args[2:]) == nil {
-			handleGenerateKeyCommand(*tGenerateKeySubCmdPhrase)
-		}
-
 	// HELP
-	case "h":
+	case "help", "h", "-h", "--help":
 		if tHelpCommand.Parse(os.Args[2:]) == nil {
 			PrintHelp()
 		}
@@ -122,7 +93,7 @@ func main() {
 	// STORAGE
 	case "storage":
 		if tStorageCommand.Parse(os.Args[2:]) == nil {
-			handleStorageCommand()
+			SelectStorage()
 		}
 
 	// COMMAND NOT FOUND
@@ -135,7 +106,7 @@ func main() {
 }
 
 // handleSendCommand ///////////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func handleSendCommand(
 	pSendSubCmdPath string,
 	pSendSubCmdMessage string,
@@ -163,48 +134,4 @@ func handleSendCommand(
 		tAllowDelete = true
 	}
 	SendQRClip(pSendSubCmdPath, pSendSubCmdMessage, tExpirationInMinutes, tMaxTransfers, tAllowDelete)
-}
-
-// handleEncryptCommand ////////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func handleEncryptCommand(pEncryptSubCmdFile string, pEncryptSubCmdKey string) {
-	if pEncryptSubCmdFile == "" {
-		PrintHelpEncrypt()
-		ExitWithError("File is needed")
-	}
-	OfflineEncrypt(pEncryptSubCmdFile, pEncryptSubCmdKey)
-}
-
-// handleDecryptCommand ////////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func handleDecryptCommand(pDecryptSubCmdFile string, pDecryptSubCmdKey string) {
-	if pDecryptSubCmdFile == "" || pDecryptSubCmdKey == "" {
-		PrintHelpDecrypt()
-		if pDecryptSubCmdFile == "" && pDecryptSubCmdKey == "" {
-			ExitWithError("File and key are needed!")
-		}
-		if pDecryptSubCmdFile == "" {
-			ExitWithError("File is needed!")
-		}
-		if pDecryptSubCmdKey == "" {
-			ExitWithError("Key is needed!")
-		}
-	}
-	OfflineDecrypt(pDecryptSubCmdFile, pDecryptSubCmdKey)
-}
-
-// handleGenerateKeyCommand ////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func handleGenerateKeyCommand(pPhrase string) {
-	if pPhrase == "" {
-		ShowSuccess(GenerateEncryptionKey())
-	} else {
-		ShowSuccess(GenerateEncryptionKeyWithPhrase(pPhrase))
-	}
-}
-
-// handleStorageCommand ////////////////////////////////////////////////////////////////////////////////////////////////
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func handleStorageCommand() {
-	SelectStorage()
 }

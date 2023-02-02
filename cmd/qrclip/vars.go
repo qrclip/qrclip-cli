@@ -2,7 +2,7 @@ package main
 
 // API URL
 var gApiUrl = "https://api.qrclip.io"
-var gSpaUrl = "https://www.qrclip.io"
+var gSpaUrl = "https://app.qrclip.io"
 
 //var gApiUrl = "http://localhost:3000"
 //var gSpaUrl = "http://localhost"
@@ -16,8 +16,8 @@ var gFileChunkSizeBytes = 1000 * 1024 * 50
 // QRCODE WITH HALF BLOCKS - SMALLER QRCODE (doesn't work on Windows)
 var gHalfBlocks = false
 
-// IV TRIES
-var gIVTries = 10
-
 // QRCLIP VERSION
-var gClientVersion = 3
+var gClientVersion = 4
+
+// XChaCha20-Poly1305 MAC SIZE
+var gMACSize = 16
