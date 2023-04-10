@@ -2,22 +2,23 @@ package main
 
 // API URL
 var gApiUrl = "https://api.qrclip.io"
-var gSpaUrl = "https://app.qrclip.io"
+
+const gSpaUrl = "https://app.qrclip.io"
 
 //var gApiUrl = "http://localhost:3000"
 //var gSpaUrl = "http://localhost"
 
 // PROGRESS BAR TEMPLATE
-var gProgressBarTemplate = `{{ " " }} {{ bar . "|" "-" (cycle . "-" "|" "-" "|" ) "." "|"}} {{percent . "%06.2f%%" "?"}}`
+const gProgressBarTemplate = `{{ " " }} {{ bar . "|" "-" (cycle . "-" "|" "-" "|" ) "." "|"}} {{percent . "%06.2f%%" "?"}}`
 
 // FILE CHUNK SIZE
-var gFileChunkSizeBytes = 1000 * 1024 * 50
+const gFileChunkSizeBytes = 1000 * 1024 * 50
 
 // QRCODE WITH HALF BLOCKS - SMALLER QRCODE (doesn't work on Windows)
-var gHalfBlocks = false
+const gHalfBlocks = false
 
 // QRCLIP VERSION
-var gClientVersion = 4
+const gClientVersion = 5
 
 // XChaCha20-Poly1305 MAC SIZE
-var gMACSize = 16
+const gMACSize = 16

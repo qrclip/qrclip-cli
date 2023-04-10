@@ -11,7 +11,7 @@ import (
 )
 
 // ReceiveQRClip ///////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func ReceiveQRClip(pId string, pSubId string, pKey string, pUrl string) {
 	if pId != "" && pSubId != "" && pKey != "" {
 		DisplayAndDownloadQRClip(pId, pSubId, pKey)
@@ -25,9 +25,25 @@ func ReceiveQRClip(pId string, pSubId string, pKey string, pUrl string) {
 }
 
 // DisplayAndDownloadQRClip ////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func DisplayAndDownloadQRClip(pId string, pSubId string, pKey string) {
-	tClipDto, tErr := getQRClip(pId, pSubId)
+	tBeforeOpenInfoDto, tErr := getQRClipBeforeOpenInfo(pId, pSubId)
+	if tErr != nil {
+		ExitWithError(tErr.Error())
+	}
+
+	// CHECK VERSION
+	if tBeforeOpenInfoDto.Version > gClientVersion {
+		ExitWithError("Update CLI to latest version first!")
+	}
+
+	// CHECK PASSWORD AND ASK FOR IT
+	var tAccessKey string
+	if tBeforeOpenInfoDto.PasswordProtected {
+		pKey, tAccessKey = GetUserPassword(pKey, pSubId)
+	}
+
+	tClipDto, tErr := getQRClip(pId, pSubId, &tAccessKey)
 	if tErr != nil {
 		ExitWithError(tErr.Error())
 	}
@@ -38,14 +54,14 @@ func DisplayAndDownloadQRClip(pId string, pSubId string, pKey string) {
 		showQRClipInfo(tClipDto, pKey)
 
 		// DOWNLOAD QRCLIP FILES
-		downloadQRClipFiles(tClipDto, pKey)
+		downloadQRClipFiles(tClipDto, pKey, &tAccessKey)
 	} else {
 		ExitWithError("QRClip not found!")
 	}
 }
 
 // handleQRClipUrl /////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func handleQRClipUrl(pUrl string) {
 	tKey := ""
 	tId := ""
@@ -67,12 +83,11 @@ func handleQRClipUrl(pUrl string) {
 	if len(tSplitKey) == 2 {
 		tId = tSplitKey[1]
 	}
-
 	DisplayAndDownloadQRClip(tId, tSubId, tKey)
 }
 
 // startReceiveMode ////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func startReceiveMode() {
 	ShowInfo("GENERATING RECEIVER")
 
@@ -94,28 +109,21 @@ userInputGOTO: // FIRST GOTO I EVER USED :) AND THIS LOOKS A PERFECT PLACE TO US
 
 	GetUserInput() // HERE IF USER WANTS ABORTS AND PROGRAM EXITS
 
-	// GET CLIP
-	tClipDtoFetched, tErr := getQRClip(tClipDto.Id, tClipDto.SubId)
+	tBeforeOpenInfoDto, tErr := getQRClipBeforeOpenInfo(tClipDto.Id, tClipDto.SubId)
 	if tErr != nil {
 		ExitWithError(tErr.Error())
 	}
 
-	// IF EXISTS SHOW IT, IF NOT GOTO THE USER INPUT AGAIN
-	if tClipDtoFetched.Id == "" {
+	if tBeforeOpenInfoDto.Version == 0 {
 		ShowError("QRClip not ready!")
 		goto userInputGOTO // GOTO THE TOP AGAIN UNTIL ABORTS
-	} else {
-		tClipDto = tClipDtoFetched
-		// DECRYPT TEXT AND DISPLAY
-		showQRClipInfo(tClipDto, tKey)
-
-		// DOWNLOAD QRCLIP FILES
-		downloadQRClipFiles(tClipDto, tKey)
 	}
+
+	DisplayAndDownloadQRClip(tClipDto.Id, tClipDto.SubId, tKey)
 }
 
 // showQRClipInfo //////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func showQRClipInfo(pClipDto ClipDto, pKey string) {
 	ShowSuccess("------------------------------------------------------------")
 	ShowSuccess("Id         :" + pClipDto.Id)
@@ -130,8 +138,8 @@ func showQRClipInfo(pClipDto ClipDto, pKey string) {
 }
 
 // downloadQRClipFiles /////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func downloadQRClipFiles(pClipDto ClipDto, pKey string) {
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func downloadQRClipFiles(pClipDto ClipDto, pKey string, pAccessKey *string) {
 	tFileChunkIndex := len(pClipDto.Files) + 1 // CHUNK INDEX FOR IV INDEX CALCULATION
 	// FOR EACH FILE
 	for _, tFile := range pClipDto.Files {
@@ -146,16 +154,16 @@ func downloadQRClipFiles(pClipDto ClipDto, pKey string) {
 		tFile.Name = DecryptText(tFile.Name, pKey, tIV)
 
 		// START DOWNLOADING
-		downloadFileWithTicket(pClipDto, pKey, tFile, tFileChunkIndex)
+		downloadFileWithTicket(pClipDto, pKey, tFile, tFileChunkIndex, pAccessKey)
 
 		tFileChunkIndex = tFileChunkIndex + tFile.ChunkCount
 	}
 }
 
 // downloadFileWithTicket //////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func downloadFileWithTicket(pClipDto ClipDto, pKey string, pClipFileDto ClipFileDto, pFileChunkIndexStart int) {
-	tDownloadTicket, tErr := getFileDownloadTicket(pClipDto, pClipFileDto.Index)
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func downloadFileWithTicket(pClipDto ClipDto, pKey string, pClipFileDto ClipFileDto, pFileChunkIndexStart int, pAccessKey *string) {
+	tDownloadTicket, tErr := getFileDownloadTicket(pClipDto, pClipFileDto.Index, pAccessKey)
 	if tErr != nil {
 		ExitWithError("Error getting download ticket:" + tErr.Error())
 	}
@@ -225,7 +233,7 @@ func downloadFileWithTicket(pClipDto ClipDto, pKey string, pClipFileDto ClipFile
 }
 
 // downloadFileChunk ///////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func downloadFileChunk(pUrl string, pBar *pb.ProgressBar) ([]byte, error) {
 	tResponse, tErr := http.Get(pUrl)
 	if tErr != nil {
@@ -245,7 +253,7 @@ func downloadFileChunk(pUrl string, pBar *pb.ProgressBar) ([]byte, error) {
 }
 
 // getFileDownloadChunk ////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func getFileDownloadChunk(
 	pClipDto ClipDto,
 	pDownloadTicket GetFileDownloadTicketResponseDto) (GetFileDownloadChunkResponseDto, error) {
@@ -253,7 +261,7 @@ func getFileDownloadChunk(
 	tUrlPath := "/clips/" + pClipDto.Id + "/" + pClipDto.SubId +
 		"/file-download-chunk/" + pDownloadTicket.Id + "/" + pDownloadTicket.Key
 
-	tResponse, tErr := HttpDoGet(tUrlPath, "")
+	tResponse, tErr := HttpDoGet(tUrlPath, "", nil)
 	if tErr != nil {
 		return GetFileDownloadChunkResponseDto{}, tErr
 	}
@@ -268,12 +276,12 @@ func getFileDownloadChunk(
 }
 
 // getFileDownloadTicket ///////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func getFileDownloadTicket(pClipDto ClipDto, pFileIndex int) (GetFileDownloadTicketResponseDto, error) {
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func getFileDownloadTicket(pClipDto ClipDto, pFileIndex int, pAccessKey *string) (GetFileDownloadTicketResponseDto, error) {
 	tUrlPath := "/clips/" + pClipDto.Id + "/" + pClipDto.SubId +
 		"/file-download-ticket/" + fmt.Sprintf("%v", pFileIndex)
 
-	tResponse, tErr := HttpDoGet(tUrlPath, "")
+	tResponse, tErr := HttpDoGet(tUrlPath, "", pAccessKey)
 	if tErr != nil {
 		return GetFileDownloadTicketResponseDto{}, tErr
 	}
@@ -288,12 +296,12 @@ func getFileDownloadTicket(pClipDto ClipDto, pFileIndex int) (GetFileDownloadTic
 }
 
 // getQRClip ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func getQRClip(pId string, pSubId string) (ClipDto, error) {
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func getQRClip(pId string, pSubId string, pAccessKey *string) (ClipDto, error) {
 	tUrlPath := "/clips/" + pId + "/" + pSubId
 
 	// REQUEST
-	tResponse, tErr := HttpDoGet(tUrlPath, "")
+	tResponse, tErr := HttpDoGet(tUrlPath, "", pAccessKey)
 	if tErr != nil {
 		return ClipDto{}, tErr
 	}
@@ -314,4 +322,24 @@ func getQRClip(pId string, pSubId string) (ClipDto, error) {
 	tClipDto.IVGen = CreateQRClipIVGenerator(tClipDto.SubId, 24, 2500)
 
 	return tClipDto, nil
+}
+
+// getQRClipBeforeOpenInfo /////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func getQRClipBeforeOpenInfo(pId string, pSubId string) (BeforeOpenInfoDto, error) {
+	tUrlPath := "/clips/" + pId + "/" + pSubId + "/before-open-info"
+
+	// REQUEST
+	tResponse, tErr := HttpDoGet(tUrlPath, "", nil)
+	if tErr != nil {
+		return BeforeOpenInfoDto{}, tErr
+	}
+
+	var tBeforeOpenInfoDto BeforeOpenInfoDto
+	tErr = DecodeJSONResponse(tResponse, &tBeforeOpenInfoDto)
+	if tErr != nil {
+		return BeforeOpenInfoDto{}, tErr
+	}
+
+	return tBeforeOpenInfoDto, nil
 }

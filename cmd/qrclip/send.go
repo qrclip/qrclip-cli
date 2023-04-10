@@ -24,7 +24,10 @@ func SendQRClip(pFilePath string, pMessage string, pExpiration int, pMaxTransfer
 	tUpdateClipDto := getUpdateClipDtoObject(pFilePath, pExpiration, pMaxTransfers, pAllowDelete)
 
 	// CHECK LIMITS FOR FILE SIZE AND TEXT SIZE ALSO
-	CheckIfCanBeSent(&tUpdateClipDto) // EXITS THE PROGRAM IF NOT OK
+	tErr := CheckIfCanBeSent(&tUpdateClipDto)
+	if tErr != nil {
+		ExitWithError("Send error: " + tErr.Error())
+	}
 
 	// CREATE QRCLIP
 	tClipDto, tErr := CreateQRClip(false)

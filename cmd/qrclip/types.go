@@ -111,7 +111,7 @@ type LogInDto struct {
 
 type ClipLimitsDto struct {
 	Text             int `json:"text"`
-	FileMb           int `json:"fileMb"`
+	TotalFileSizeMb  int `json:"totalFileSizeMb"`
 	FileNumber       int `json:"fileNumber"`
 	ExpiresInMinutes int `json:"expiresInMinutes"`
 	MaxTransfers     int `json:"maxTransfers"`
@@ -151,4 +151,16 @@ type QRCStorageLocation struct {
 	Index int
 	Code  string
 	Name  string
+}
+
+type BeforeOpenInfoDto struct {
+	Version            int    `json:"version"`
+	FileSize           int    `json:"fileSize"`
+	TransferCount      int    `json:"transferCount"`
+	MaxTransfers       int    `json:"maxTransfers"`
+	DownloadedFileSize int    `json:"downloadedFileSize"`
+	Storage            string `json:"storage"`
+	ValidUntil         string `json:"validUntil"`
+	FileSizes          []int  `json:"fileSizes"`
+	PasswordProtected  bool   `json:"passwordProtected"`
 }
