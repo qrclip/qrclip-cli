@@ -25,7 +25,7 @@ jobs:
         uses: goreleaser/goreleaser-action@master
         with:
           version: latest
-          args: release --rm-dist
+          args: release --clean
           workdir: ./cmd/qrclip
         env:
           GO111MODULE: auto
