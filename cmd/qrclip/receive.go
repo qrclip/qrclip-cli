@@ -143,8 +143,6 @@ func downloadQRClipFiles(pClipDto ClipDto, pKey string, pAccessKey *string) {
 	tFileChunkIndex := len(pClipDto.Files) + 1 // CHUNK INDEX FOR IV INDEX CALCULATION
 	// FOR EACH FILE
 	for _, tFile := range pClipDto.Files {
-		fmt.Println(GetIV(&pClipDto.IVGen, int64(tFile.Index+1)))
-
 		tIV, tErr := GetIV(&pClipDto.IVGen, int64(tFile.Index+1))
 		if tErr != nil {
 			ExitWithError(tErr.Error())
@@ -163,7 +161,7 @@ func downloadQRClipFiles(pClipDto ClipDto, pKey string, pAccessKey *string) {
 // downloadFileWithTicket //////////////////////////////////////////////////////////////////////////////////////////////
 // //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func downloadFileWithTicket(pClipDto ClipDto, pKey string, pClipFileDto ClipFileDto, pFileChunkIndexStart int, pAccessKey *string) {
-	tDownloadTicket, tErr := getFileDownloadTicket(pClipDto, pClipFileDto.Index, pAccessKey)
+	tDownloadTicket, tErr := getFileDownloadTicket(pClipDto, pClipFileDto.Index, pAccessKey, pClipDto.TempToken)
 	if tErr != nil {
 		ExitWithError("Error getting download ticket:" + tErr.Error())
 	}
@@ -277,11 +275,11 @@ func getFileDownloadChunk(
 
 // getFileDownloadTicket ///////////////////////////////////////////////////////////////////////////////////////////////
 // //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-func getFileDownloadTicket(pClipDto ClipDto, pFileIndex int, pAccessKey *string) (GetFileDownloadTicketResponseDto, error) {
+func getFileDownloadTicket(pClipDto ClipDto, pFileIndex int, pAccessKey *string, pTempToken ClipTempTokenDto) (GetFileDownloadTicketResponseDto, error) {
 	tUrlPath := "/clips/" + pClipDto.Id + "/" + pClipDto.SubId +
 		"/file-download-ticket/" + fmt.Sprintf("%v", pFileIndex)
 
-	tResponse, tErr := HttpDoGet(tUrlPath, "", pAccessKey)
+	tResponse, tErr := HttpDoGetWithTempTicket(tUrlPath, "", pAccessKey, pTempToken)
 	if tErr != nil {
 		return GetFileDownloadTicketResponseDto{}, tErr
 	}

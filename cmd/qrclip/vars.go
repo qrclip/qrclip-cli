@@ -18,7 +18,7 @@ const gFileChunkSizeBytes = 1000 * 1024 * 50
 const gHalfBlocks = false
 
 // QRCLIP VERSION
-const gClientVersion = 5
+const gClientVersion = 6
 
 // XChaCha20-Poly1305 MAC SIZE
 const gMACSize = 16

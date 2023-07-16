@@ -65,7 +65,6 @@ func SelectStorage() {
 	if tErr == nil {
 		tSelectedStorage = tConfig.Storage
 	}
-	fmt.Println(tConfig)
 	tLocations := getLocations()
 
 	ShowInfoCyan("Available Storage Locations")

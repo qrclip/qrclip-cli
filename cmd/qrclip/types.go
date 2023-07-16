@@ -1,19 +1,25 @@
 package main
 
 type ClipDto struct {
-	Id            string        `json:"id"`
-	SubId         string        `json:"subId"`
-	FileSize      int64         `json:"fileSize"`
-	CanDelete     bool          `json:"canDelete"`
-	Created       string        `json:"created"`
-	EncryptedText string        `json:"encryptedText,omitempty"`
-	ValidUntil    string        `json:"validUntil"`
-	IsClipOwner   bool          `json:"isClipOwner"`
-	MaxTransfers  int           `json:"maxTransfers"`
-	Transfers     int           `json:"transfers"`
-	Files         []ClipFileDto `json:"files"`
-	Version       int           `json:"version,omitempty"`
+	Id            string           `json:"id"`
+	SubId         string           `json:"subId"`
+	FileSize      int64            `json:"fileSize"`
+	CanDelete     bool             `json:"canDelete"`
+	Created       string           `json:"created"`
+	EncryptedText string           `json:"encryptedText,omitempty"`
+	ValidUntil    string           `json:"validUntil"`
+	IsClipOwner   bool             `json:"isClipOwner"`
+	MaxTransfers  int              `json:"maxTransfers"`
+	Transfers     int              `json:"transfers"`
+	Files         []ClipFileDto    `json:"files"`
+	Version       int              `json:"version,omitempty"`
+	TempToken     ClipTempTokenDto `json:"tempToken,omitempty"`
 	IVGen         QRClipIVGenerator
+}
+
+type ClipTempTokenDto struct {
+	Id  string `json:"id"`
+	Key string `json:"key"`
 }
 
 type ClipFileDto struct {

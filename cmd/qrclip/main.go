@@ -10,7 +10,7 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func main() {
 	ShowInfoCyan("---------------------------------")
-	ShowInfoCyan("--    QRCLIP - VERSION 0.98    --")
+	ShowInfoCyan("--    QRCLIP - VERSION 1.00    --")
 	ShowInfoCyan("--                             --")
 	ShowInfoCyan("--    https://app.qrclip.io    --")
 	ShowInfoCyan("---------------------------------")

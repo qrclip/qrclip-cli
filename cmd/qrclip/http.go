@@ -37,6 +37,34 @@ func HttpDoGet(pUrlPath string, pJwt string, pAccessKey *string) (*http.Response
 	}
 }
 
+// HttpDoGet ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+// /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func HttpDoGetWithTempTicket(pUrlPath string, pJwt string, pAccessKey *string, pTempToken ClipTempTokenDto) (*http.Response, error) {
+	tRequest, tErr := newHttpGetRequest(pUrlPath, pJwt)
+	if tErr != nil {
+		return nil, tErr
+	}
+
+	if pAccessKey != nil {
+		tRequest.Header.Set("qrclip-access-key", *pAccessKey)
+	}
+
+	tRequest.Header.Set("qrclip-temp-token-id", pTempToken.Id)
+	tRequest.Header.Set("qrclip-temp-token-key", pTempToken.Key)
+
+	tResponse, tErr := httpDoRequest(tRequest)
+	if tErr != nil {
+		return nil, tErr
+	}
+
+	// CHECK STATUS CODE
+	if strings.HasPrefix(tResponse.Status, "2") {
+		return tResponse, nil
+	} else {
+		return nil, errors.New(tResponse.Status)
+	}
+}
+
 // HttpDoPut ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func HttpDoPut(pUrlPath string, pJwt string, pBody interface{}) (*http.Response, error) {
