@@ -1,5 +1,9 @@
 package main
 
+import "time"
+
+var gVersion = "1.10"
+
 // API URL
 var gApiUrl = "https://api.qrclip.io"
 
@@ -22,3 +26,9 @@ const gClientVersion = 6
 
 // XChaCha20-Poly1305 MAC SIZE
 const gMACSize = 16
+
+const (
+	gHttpResponseTimeoutSeconds = 10
+	gHttpMaxRetries             = 5
+	gHttpBaseDelay              = 1 * time.Second
+)

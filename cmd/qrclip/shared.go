@@ -6,7 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/fatih/color"
-	"github.com/mdp/qrterminal"
+	"github.com/mdp/qrterminal/v3"
 	"os"
 	"strings"
 )
@@ -39,7 +39,7 @@ func CreateQRClip(pReceiveMode bool) (ClipDto, error) {
 	if tErr != nil {
 		return ClipDto{}, tErr
 	}
-
+	defer tResponse.Body.Close()
 	// PARSE RESPONSE
 	var tClipDto ClipDto
 	tErr = DecodeJSONResponse(tResponse, &tClipDto)
@@ -55,12 +55,12 @@ func CreateQRClip(pReceiveMode bool) (ClipDto, error) {
 func GetQRCodeTerminalConfig() qrterminal.Config {
 	//goland:noinspection ALL
 	return qrterminal.Config{
-		Level:      qrterminal.M,
+		Level:      qrterminal.L,
 		Writer:     os.Stdout,
 		HalfBlocks: gHalfBlocks,
 		BlackChar:  qrterminal.BLACK,
 		WhiteChar:  qrterminal.WHITE,
-		QuietZone:  2,
+		QuietZone:  1,
 	}
 }
 
@@ -130,6 +130,14 @@ func ShowInfo(pInfo string) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func ShowInfoCyan(pInfo string) {
 	color.Set(color.FgCyan)
+	fmt.Println(pInfo)
+	color.Unset()
+}
+
+// ShowInfoBlue ////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func ShowInfoBlue(pInfo string) {
+	color.Set(color.FgBlue)
 	fmt.Println(pInfo)
 	color.Unset()
 }

@@ -155,6 +155,7 @@ func getFileChunkUploadLink(pClipDto ClipDto,
 	if tErr != nil {
 		return FileChunkUploadLinkResponse{}, tErr
 	}
+	defer tResponse.Body.Close()
 
 	// PARSE  RESPONSE
 	var tFileChunkUploadLinkResponse FileChunkUploadLinkResponse
@@ -176,7 +177,8 @@ func fileUploadFinished(pClipDto ClipDto, pFileUploadFinishedDto FileUploadFinis
 	if tErr != nil {
 		return FileUploadFinishedResponseDto{}, tErr
 	}
-
+	defer tResponse.Body.Close()
+	
 	// PARSE  RESPONSE
 	var tFileUploadFinishedResponseDto FileUploadFinishedResponseDto
 	tErr = DecodeJSONResponse(tResponse, &tFileUploadFinishedResponseDto)
@@ -279,8 +281,7 @@ func uploadChunkPost(pS3PreSignedPost S3PreSignedPost, pBuffer []byte, pBar *pb.
 	tRequest.ContentLength = int64(tBody.Len()) // IT'S NEEDED FOR S3
 
 	// SEND REQUEST
-	tClient := &http.Client{}
-	tResponse, tErr := tClient.Do(tRequest)
+	tResponse, tErr := httpDoRequest(tRequest)
 	if tErr != nil {
 		ExitWithError(tErrorPrefix + tErr.Error())
 	}
@@ -305,8 +306,7 @@ func uploadChunkPut(pUrl string, pBuffer []byte, pBar *pb.ProgressBar) {
 	tRequest.ContentLength = int64(len(pBuffer)) // IT'S NEEDED FOR S3
 
 	// SEND REQUEST
-	tClient := &http.Client{}
-	tResponse, tErr := tClient.Do(tRequest)
+	tResponse, tErr := httpDoRequest(tRequest)
 	if tErr != nil {
 		ExitWithError(tErrorPrefix + tErr.Error())
 	}
@@ -401,6 +401,7 @@ func updateQRClip(pClipDto ClipDto, pUpdateClipDto UpdateClipDto) (UpdateClipRes
 	if tErr != nil {
 		return UpdateClipResponseDto{}, tErr
 	}
+	defer tResponse.Body.Close()
 
 	// PARSE RESPONSE
 	var tUpdateClipResponseDto UpdateClipResponseDto

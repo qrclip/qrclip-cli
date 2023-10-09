@@ -2,15 +2,20 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"net/http"
 	"os"
 	"strconv"
+	"time"
 )
+
+var gHttpClient = &http.Client{Timeout: gHttpResponseTimeoutSeconds * time.Second}
 
 // main ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func main() {
 	ShowInfoCyan("---------------------------------")
-	ShowInfoCyan("--    QRCLIP - VERSION 1.00    --")
+	ShowInfoCyan("--    QRCLIP - VERSION " + gVersion + "    --")
 	ShowInfoCyan("--                             --")
 	ShowInfoCyan("--    https://app.qrclip.io    --")
 	ShowInfoCyan("---------------------------------")
@@ -79,7 +84,7 @@ func main() {
 		}
 
 	// CHECK LIMITS
-	case "check", "c":
+	case "check", "c", "limits", "limit":
 		if tCheckCommand.Parse(os.Args[2:]) == nil {
 			CheckLimits()
 		}
@@ -88,6 +93,12 @@ func main() {
 	case "help", "h", "-h", "--help":
 		if tHelpCommand.Parse(os.Args[2:]) == nil {
 			PrintHelp()
+		}
+
+	// VERSION
+	case "version", "v", "-v", "--version":
+		if tHelpCommand.Parse(os.Args[2:]) == nil {
+			PrintVersion()
 		}
 
 	// STORAGE
@@ -120,13 +131,13 @@ func handleSendCommand(
 	}
 	tExpirationInMinutes, tErr := strconv.Atoi(pSendSubCmdExpiration)
 	if tErr != nil {
-		ShowWarning("Expiration invalid using default 15 minutes")
-		tExpirationInMinutes = 15
+		ShowWarning("Expiration invalid using default 2 Days")
+		tExpirationInMinutes = 2880
 	}
 	tMaxTransfers, tErr := strconv.Atoi(pSendSubCmdMaxTransfers)
 	if tErr != nil {
-		ShowWarning("Max transfers invalid using default 2")
-		tMaxTransfers = 2
+		ShowWarning("Max transfers invalid using default 5")
+		tMaxTransfers = 5
 	}
 	tAllowDelete, tErr := strconv.ParseBool(pSendSubCmdAllowDelete)
 	if tErr != nil {
@@ -134,4 +145,10 @@ func handleSendCommand(
 		tAllowDelete = true
 	}
 	SendQRClip(pSendSubCmdPath, pSendSubCmdMessage, tExpirationInMinutes, tMaxTransfers, tAllowDelete)
+}
+
+// PrintVersion ////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+func PrintVersion() {
+	fmt.Println(gVersion)
 }

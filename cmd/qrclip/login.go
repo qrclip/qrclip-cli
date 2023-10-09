@@ -9,7 +9,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/golang-jwt/jwt"
-	"github.com/mdp/qrterminal"
+	"github.com/mdp/qrterminal/v3"
 	"golang.org/x/term"
 )
 
@@ -112,6 +112,7 @@ func qrLogin(pLoginApprovalDto LoginApprovalDto) (LogInResponseDto, error) {
 	if tErr != nil {
 		return LogInResponseDto{}, tErr
 	}
+	defer tResponse.Body.Close()
 
 	// PARSE RESPONSE
 	var tLogInResponseDto LogInResponseDto
@@ -198,10 +199,11 @@ func refreshCredentials(pLogInDto LogInDto) (string, error) {
 	tRefreshTokenRequestDto.UserId = getUserIdFromJWT(pLogInDto.AccessToken)
 
 	// REQUEST
-	tResponse, tErr := HttpDoPut("/users/refresh-token", "", tRefreshTokenRequestDto)
+	tResponse, tErr := HttpDoPost("/users/refresh-token", "", tRefreshTokenRequestDto)
 	if tErr != nil {
 		return "", tErr
 	}
+	defer tResponse.Body.Close()
 
 	var tLogInResponseDto LogInResponseDto
 	tErr = DecodeJSONResponse(tResponse, &tLogInResponseDto)
@@ -223,6 +225,7 @@ func getJWTClaim(pJwt string, pKeyName string) (interface{}, error) {
 	tToken, _, tErr := new(jwt.Parser).ParseUnverified(pJwt, jwt.MapClaims{})
 	if tErr != nil {
 		ShowError(tErr.Error())
+		return nil, tErr
 	}
 	if tClaims, ok := tToken.Claims.(jwt.MapClaims); ok {
 		if tClaims[pKeyName] != nil {
@@ -309,6 +312,7 @@ func loginWithUsernamePassword(pUsername string, pPassword string) {
 	if tErr != nil {
 		ExitWithError("Error login: " + tErr.Error())
 	}
+	defer tResponse.Body.Close()
 
 	var tLogInResponseDto LogInResponseDto
 	tErr = DecodeJSONResponse(tResponse, &tLogInResponseDto)

@@ -54,6 +54,20 @@ func getLocations() []QRCStorageLocation {
 	tLoc5.Code = "storj"
 	tLocations = append(tLocations, tLoc5)
 
+	// India
+	var tLoc6 QRCStorageLocation
+	tLoc6.Index = 6
+	tLoc6.Name = "Bangalore (India)"
+	tLoc6.Code = "storage06"
+	tLocations = append(tLocations, tLoc6)
+
+	// India
+	var tLoc7 QRCStorageLocation
+	tLoc7.Index = 7
+	tLoc7.Name = "Sidney (Australia)"
+	tLoc7.Code = "storage07"
+	tLocations = append(tLocations, tLoc7)
+
 	return tLocations
 }
 
