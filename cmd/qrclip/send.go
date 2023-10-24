@@ -178,7 +178,7 @@ func fileUploadFinished(pClipDto ClipDto, pFileUploadFinishedDto FileUploadFinis
 		return FileUploadFinishedResponseDto{}, tErr
 	}
 	defer tResponse.Body.Close()
-	
+
 	// PARSE  RESPONSE
 	var tFileUploadFinishedResponseDto FileUploadFinishedResponseDto
 	tErr = DecodeJSONResponse(tResponse, &tFileUploadFinishedResponseDto)

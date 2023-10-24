@@ -2,7 +2,7 @@ package main
 
 import "time"
 
-var gVersion = "1.10"
+var gVersion = "1.11"
 
 // API URL
 var gApiUrl = "https://api.qrclip.io"

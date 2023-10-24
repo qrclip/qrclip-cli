@@ -233,7 +233,12 @@ func downloadFileWithTicket(pClipDto ClipDto, pKey string, pClipFileDto ClipFile
 // downloadFileChunk ///////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func downloadFileChunk(pUrl string, pBar *pb.ProgressBar) ([]byte, error) {
-	tResponse, tErr := http.Get(pUrl)
+	tRequest, tErr := http.NewRequest("GET", pUrl, nil)
+	if tErr != nil {
+		ExitWithError(tErr.Error())
+	}
+
+	tResponse, tErr := httpDoRequest(tRequest)
 	if tErr != nil {
 		return nil, tErr
 	}
